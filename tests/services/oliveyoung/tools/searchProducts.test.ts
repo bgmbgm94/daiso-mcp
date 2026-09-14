@@ -16,14 +16,8 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-function createZyteResponse(body: unknown) {
-  const encoded = Buffer.from(JSON.stringify(body), 'utf8').toString('base64');
-  return new Response(
-    JSON.stringify({
-      statusCode: 200,
-      httpResponseBody: encoded,
-    }),
-  );
+function createDirectResponse(body: unknown, status = 200) {
+  return Response.json(body, { status });
 }
 
 describe('createSearchProductsTool', () => {
@@ -36,7 +30,7 @@ describe('createSearchProductsTool', () => {
 
   it('상품 목록을 반환한다', async () => {
     mockFetch.mockResolvedValue(
-      createZyteResponse({
+      createDirectResponse({
         status: 'SUCCESS',
         data: {
           totalCount: 1,

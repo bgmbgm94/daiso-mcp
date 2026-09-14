@@ -13,7 +13,7 @@ npm ci
 cp .env.example .env
 ```
 
-`.env`에는 필요한 경우 `ZYTE_API_KEY`를 설정하세요.
+Zyte 유료 호출은 비용 정책에 따라 중지되어 있으며 `ZYTE_API_KEY`를 설정해도 활성화되지 않습니다. 무료 조회와 선택적 중계 구성은 [운영 정책](docs/zyte-free-access.md)을 참고하세요.
 
 ## 개발 명령어
 

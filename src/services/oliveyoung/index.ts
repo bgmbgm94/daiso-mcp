@@ -12,11 +12,13 @@ const OLIVEYOUNG_METADATA: ServiceMetadata = {
   id: 'oliveyoung',
   name: '올리브영',
   version: '1.0.0',
-  description: '올리브영 상품 검색, 주변 매장 탐색 및 재고 파악 서비스 (Zyte API 기반)',
+  description: '올리브영 상품 검색, 주변 매장 탐색 및 재고 파악 서비스 (무료 직접 요청 및 브라우저 릴레이)',
 };
 
 interface OliveyoungServiceOptions {
   zyteApiKey?: string;
+  relayUrl?: string;
+  relayToken?: string;
 }
 
 class OliveyoungService implements ServiceProvider {
@@ -26,9 +28,9 @@ class OliveyoungService implements ServiceProvider {
 
   getTools(): ToolRegistration[] {
     return [
-      createSearchProductsTool(this.options.zyteApiKey),
-      createFindNearbyStoresTool(this.options.zyteApiKey),
-      createCheckInventoryTool(this.options.zyteApiKey),
+      createSearchProductsTool(this.options.zyteApiKey, this.options),
+      createFindNearbyStoresTool(this.options.zyteApiKey, this.options),
+      createCheckInventoryTool(this.options.zyteApiKey, this.options),
     ];
   }
 }

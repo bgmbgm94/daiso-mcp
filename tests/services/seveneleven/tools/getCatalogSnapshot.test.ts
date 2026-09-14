@@ -1,3 +1,4 @@
+import { clearSevenElevenReadCache } from '../../../../src/services/seveneleven/readCache.js';
 /**
  * 세븐일레븐 카탈로그 스냅샷 도구 테스트
  */
@@ -8,6 +9,7 @@ import { createGetCatalogSnapshotTool } from '../../../../src/services/sevenelev
 const mockFetch = vi.fn();
 
 beforeEach(() => {
+  clearSevenElevenReadCache();
   mockFetch.mockReset();
   vi.stubGlobal('fetch', mockFetch);
 });
@@ -31,7 +33,15 @@ describe('createGetCatalogSnapshotTool', () => {
           JSON.stringify({
             success: true,
             data: {
-              content: [{ prdNo: '1', itemCd: '111', itemOnm: '상품A', onlinePrice: 1000, onlineCost: 1200 }],
+              content: [
+                {
+                  prdNo: '1',
+                  itemCd: '111',
+                  itemOnm: '상품A',
+                  onlinePrice: 1000,
+                  onlineCost: 1200,
+                },
+              ],
             },
           }),
         ),
@@ -41,7 +51,15 @@ describe('createGetCatalogSnapshotTool', () => {
           JSON.stringify({
             success: true,
             data: {
-              content: [{ prdNo: '2', itemCd: '222', itemOnm: '이슈상품', onlinePrice: 2000, onlineCost: 2500 }],
+              content: [
+                {
+                  prdNo: '2',
+                  itemCd: '222',
+                  itemOnm: '이슈상품',
+                  onlinePrice: 2000,
+                  onlineCost: 2500,
+                },
+              ],
             },
           }),
         ),
@@ -73,36 +91,13 @@ describe('createGetCatalogSnapshotTool', () => {
     expect(parsed.exhibitions.items[0].productCount).toBe(2);
   });
 
-  it('주입된 Zyte 키로 차단된 카탈로그 API를 복구한다', async () => {
-    const payload = {
-      success: true,
-      data: { content: [{ prdNo: '1', itemCd: '111', itemOnm: '상품A' }] },
-    };
-    mockFetch
-      .mockResolvedValueOnce(new Response('blocked', { status: 403 }))
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            statusCode: 200,
-            httpResponseBody: Buffer.from(JSON.stringify(payload)).toString('base64'),
-          }),
-        ),
-      );
-
+  it('키가 있어도 카탈로그 차단 시 유료 호출 없이 빈 결과를 반환한다', async () => {
+    mockFetch.mockResolvedValueOnce(new Response('blocked', { status: 403 }));
     const result = await createGetCatalogSnapshotTool('worker-key').handler({
       includeIssues: false,
       includeExhibition: false,
     });
-
-    expect(JSON.parse(result.content[0].text).pages.totalCount).toBe(1);
-    expect(mockFetch).toHaveBeenNthCalledWith(
-      2,
-      'https://api.zyte.com/v1/extract',
-      expect.objectContaining({
-        headers: expect.objectContaining({
-          Authorization: `Basic ${Buffer.from('worker-key:').toString('base64')}`,
-        }),
-      }),
-    );
+    expect(JSON.parse(result.content[0].text).pages.totalCount).toBe(0);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 });

@@ -1,3 +1,4 @@
+import type { OliveyoungRequestOptions } from '../transport.js';
 /**
  * 올리브영 주변 매장 탐색 도구
  */
@@ -16,7 +17,7 @@ interface FindNearbyStoresArgs {
   zyteApiKey?: string;
 }
 
-async function findNearbyStores(args: FindNearbyStoresArgs): Promise<McpToolResponse> {
+async function findNearbyStores(args: FindNearbyStoresArgs, transport: OliveyoungRequestOptions): Promise<McpToolResponse> {
   const {
     latitude = 37.5665,
     longitude = 126.978,
@@ -37,6 +38,7 @@ async function findNearbyStores(args: FindNearbyStoresArgs): Promise<McpToolResp
     {
       timeout: timeoutMs,
       apiKey: zyteApiKey,
+      ...transport,
     }
   );
 
@@ -59,7 +61,7 @@ async function findNearbyStores(args: FindNearbyStoresArgs): Promise<McpToolResp
   };
 }
 
-export function createFindNearbyStoresTool(apiKey?: string): ToolRegistration {
+export function createFindNearbyStoresTool(apiKey?: string, transport: OliveyoungRequestOptions = {}): ToolRegistration {
   return {
     name: 'oliveyoung_find_nearby_stores',
     metadata: {
@@ -78,6 +80,6 @@ export function createFindNearbyStoresTool(apiKey?: string): ToolRegistration {
       },
     },
     handler: ((args: FindNearbyStoresArgs) =>
-      findNearbyStores({ ...args, zyteApiKey: apiKey })) as (args: unknown) => Promise<McpToolResponse>,
+      findNearbyStores({ ...args, zyteApiKey: apiKey }, transport)) as (args: unknown) => Promise<McpToolResponse>,
   };
 }

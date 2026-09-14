@@ -2,8 +2,10 @@
  * 앱 통합 테스트 - 세븐일레븐 API
  */
 
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import app from '../../src/index.js';
+import { clearSevenElevenReadCache } from '../../src/services/seveneleven/readCache.js';
+beforeEach(clearSevenElevenReadCache);
 import { setupFetchMock } from './testHelpers.js';
 
 const mockFetch = vi.fn();

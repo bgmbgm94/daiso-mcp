@@ -16,14 +16,8 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-function createZyteResponse(body: unknown) {
-  const encoded = Buffer.from(JSON.stringify(body), 'utf8').toString('base64');
-  return new Response(
-    JSON.stringify({
-      statusCode: 200,
-      httpResponseBody: encoded,
-    })
-  );
+function createDirectResponse(body: unknown, status = 200) {
+  return Response.json(body, { status });
 }
 
 describe('createFindNearbyStoresTool', () => {
@@ -36,7 +30,7 @@ describe('createFindNearbyStoresTool', () => {
 
   it('주변 매장 목록을 반환한다', async () => {
     mockFetch.mockResolvedValue(
-      createZyteResponse({
+      createDirectResponse({
         status: 'SUCCESS',
         data: {
           totalCount: 2,
@@ -73,9 +67,9 @@ describe('createFindNearbyStoresTool', () => {
     expect(parsed.stores[0].storeCode).toBe('D176');
   });
 
-  it('Zyte 요청 헤더에 Basic 인증을 포함한다', async () => {
+  it('직접 요청에 JSON 헤더를 포함한다', async () => {
     mockFetch.mockResolvedValue(
-      createZyteResponse({
+      createDirectResponse({
         status: 'SUCCESS',
         data: { totalCount: 0, storeList: [] },
       })
@@ -85,11 +79,11 @@ describe('createFindNearbyStoresTool', () => {
     await tool.handler({});
 
     expect(mockFetch).toHaveBeenCalledWith(
-      'https://api.zyte.com/v1/extract',
+      'https://www.oliveyoung.co.kr/oystore/api/storeFinder/find-store',
       expect.objectContaining({
         method: 'POST',
         headers: expect.objectContaining({
-          Authorization: expect.stringMatching(/^Basic /),
+          'Content-Type': 'application/json',
         }),
       })
     );

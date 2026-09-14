@@ -18,14 +18,8 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-function createZyteResponse(body: unknown) {
-  const encoded = Buffer.from(JSON.stringify(body), 'utf8').toString('base64');
-  return new Response(
-    JSON.stringify({
-      statusCode: 200,
-      httpResponseBody: encoded,
-    })
-  );
+function createDirectResponse(body: unknown, status = 200) {
+  return Response.json(body, { status });
 }
 
 describe('createCheckInventoryTool', () => {
@@ -45,7 +39,7 @@ describe('createCheckInventoryTool', () => {
   it('주변 매장과 재고 결과를 함께 반환한다', async () => {
     mockFetch
       .mockResolvedValueOnce(
-        createZyteResponse({
+        createDirectResponse({
           status: 'SUCCESS',
           data: {
             totalCount: 1,
@@ -64,7 +58,7 @@ describe('createCheckInventoryTool', () => {
         })
       )
       .mockResolvedValueOnce(
-        createZyteResponse({
+        createDirectResponse({
           status: 'SUCCESS',
           data: {
             totalCount: 2,
@@ -94,19 +88,19 @@ describe('createCheckInventoryTool', () => {
         })
       )
       .mockResolvedValueOnce(
-        createZyteResponse({
+        createDirectResponse({
           status: 'SUCCESS',
           data: { goodsInfo: { masterGoodsNumber: '8801' } },
         })
       )
       .mockResolvedValueOnce(
-        createZyteResponse({
+        createDirectResponse({
           status: 'SUCCESS',
           data: { goodsInfo: { masterGoodsNumber: '8802' } },
         })
       )
       .mockResolvedValueOnce(
-        createZyteResponse({
+        createDirectResponse({
           status: 'SUCCESS',
           data: {
             totalCount: 1,
@@ -122,7 +116,7 @@ describe('createCheckInventoryTool', () => {
         })
       )
       .mockResolvedValueOnce(
-        createZyteResponse({
+        createDirectResponse({
           status: 'SUCCESS',
           data: {
             totalCount: 1,
@@ -158,13 +152,13 @@ describe('createCheckInventoryTool', () => {
   it('stockCheckLimit으로 주변 매장 재고 보강 상품 수를 제한한다', async () => {
     mockFetch
       .mockResolvedValueOnce(
-        createZyteResponse({
+        createDirectResponse({
           status: 'SUCCESS',
           data: { totalCount: 1, storeList: [{ storeCode: 'D176', storeName: '올리브영 명동 타운' }] },
         })
       )
       .mockResolvedValueOnce(
-        createZyteResponse({
+        createDirectResponse({
           status: 'SUCCESS',
           data: {
             totalCount: 2,
@@ -177,13 +171,13 @@ describe('createCheckInventoryTool', () => {
         })
       )
       .mockResolvedValueOnce(
-        createZyteResponse({
+        createDirectResponse({
           status: 'SUCCESS',
           data: { goodsInfo: { masterGoodsNumber: '8801' } },
         })
       )
       .mockResolvedValueOnce(
-        createZyteResponse({
+        createDirectResponse({
           status: 'SUCCESS',
           data: { totalCount: 1, storeList: [{ storeCode: 'D176', salesStoreYn: true, remainQuantity: 2 }] },
         })
@@ -201,7 +195,7 @@ describe('createCheckInventoryTool', () => {
   it('상품 API의 searchList 오타 보정 필드를 처리한다', async () => {
     mockFetch
       .mockResolvedValueOnce(
-        createZyteResponse({
+        createDirectResponse({
           status: 'SUCCESS',
           data: {
             totalCount: 0,
@@ -210,7 +204,7 @@ describe('createCheckInventoryTool', () => {
         })
       )
       .mockResolvedValueOnce(
-        createZyteResponse({
+        createDirectResponse({
           status: 'SUCCESS',
           data: {
             totalCount: 1,
@@ -230,13 +224,13 @@ describe('createCheckInventoryTool', () => {
         })
       )
       .mockResolvedValueOnce(
-        createZyteResponse({
+        createDirectResponse({
           status: 'SUCCESS',
           data: { goodsInfo: { masterGoodsNumber: '8803' } },
         })
       )
       .mockResolvedValueOnce(
-        createZyteResponse({
+        createDirectResponse({
           status: 'SUCCESS',
           data: {
             totalCount: 1,

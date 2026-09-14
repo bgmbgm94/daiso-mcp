@@ -722,3 +722,18 @@ describe('GET /api/health/checks', () => {
     expect(data.error.code).toBe('INVALID_HEALTH_CHECK_MODE');
   });
 });
+
+it('인증된 내부 health도 원본 차단 후 Zyte를 호출하지 않는다', async () => {
+  mockFetch.mockResolvedValue(new Response('blocked', { status: 403 }));
+  const response = await app.request(
+    '/api/health/checks?check=cgv.theaters&fresh=true',
+    { headers: { Authorization: 'Bearer health-test', 'x-health-check-force-fresh': 'true' } },
+    { HEALTH_CHECK_SECRET: 'health-test', ZYTE_API_KEY: 'remaining-key' },
+  );
+  expect(response.status).toBe(200);
+  const data = await response.json() as { checks: Array<{ status: string; message: string }> };
+  expect(data.checks[0].status).toBe('fail');
+  expect(data.checks[0].message).toContain('비용 정책');
+  expect(mockFetch).toHaveBeenCalledTimes(1);
+  expect(mockFetch.mock.calls.every(([url]) => new URL(String(url)).hostname !== 'api.zyte.com')).toBe(true);
+});

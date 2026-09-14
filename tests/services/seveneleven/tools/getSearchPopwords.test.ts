@@ -1,3 +1,4 @@
+import { clearSevenElevenReadCache } from '../../../../src/services/seveneleven/readCache.js';
 /**
  * 세븐일레븐 인기 검색어 도구 테스트
  */
@@ -8,6 +9,7 @@ import { createGetSearchPopwordsTool } from '../../../../src/services/seveneleve
 const mockFetch = vi.fn();
 
 beforeEach(() => {
+  clearSevenElevenReadCache();
   mockFetch.mockReset();
   vi.stubGlobal('fetch', mockFetch);
 });
@@ -55,33 +57,12 @@ describe('createGetSearchPopwordsTool', () => {
     expect(parsed.note).toContain('찾지 못했습니다');
   });
 
-  it('주입된 Zyte 키로 차단된 인기 검색어 API를 복구한다', async () => {
-    const payload = {
-      success: true,
-      data: { list: [{ keyword: '도시락' }] },
-    };
-    mockFetch
-      .mockResolvedValueOnce(new Response('blocked', { status: 403 }))
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            statusCode: 200,
-            httpResponseBody: Buffer.from(JSON.stringify(payload)).toString('base64'),
-          }),
-        ),
-      );
-
-    const result = await createGetSearchPopwordsTool('worker-key').handler({ label: 'home' });
-
-    expect(JSON.parse(result.content[0].text).keywords).toEqual(['도시락']);
-    expect(mockFetch).toHaveBeenNthCalledWith(
-      2,
-      'https://api.zyte.com/v1/extract',
-      expect.objectContaining({
-        headers: expect.objectContaining({
-          Authorization: `Basic ${Buffer.from('worker-key:').toString('base64')}`,
-        }),
-      }),
-    );
+  it('키가 있어도 차단된 인기 검색어 요청에 유료 호출을 보내지 않는다', async () => {
+    mockFetch.mockResolvedValueOnce(new Response('blocked', { status: 403 }));
+    await expect(
+      createGetSearchPopwordsTool('worker-key').handler({ label: 'home' }),
+    ).rejects.toThrow('비용 정책');
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(mockFetch.mock.calls.some(([url]) => new URL(String(url)).hostname === 'api.zyte.com')).toBe(false);
   });
 });

@@ -20,8 +20,7 @@ describe('createCheckInventoryTool', () => {
   it('storeLimit이 0이면 차단된 재고 뒤의 매장 조회를 생략한다', async () => {
     mockFetch
       .mockResolvedValueOnce(new Response(JSON.stringify({ areaList: [] })))
-      .mockResolvedValueOnce(new Response('blocked', { status: 403 }))
-      .mockResolvedValueOnce(new Response('error code: 520', { status: 520 }));
+      .mockResolvedValueOnce(new Response('<!doctype html>blocked'));
 
     const tool = createCheckInventoryTool({ zyteApiKey: 'worker-key' });
     const result = await tool.handler({ keyword: '커피', storeLimit: 0 });
@@ -40,16 +39,14 @@ describe('createCheckInventoryTool', () => {
         stores: [],
       }),
     );
-    expect(mockFetch).toHaveBeenCalledTimes(3);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
   });
 
   it('기본 매장 조회까지 차단되어도 degraded 결과를 반환한다', async () => {
     mockFetch
       .mockResolvedValueOnce(new Response(JSON.stringify({ areaList: [] })))
-      .mockResolvedValueOnce(new Response('stock blocked', { status: 403 }))
-      .mockResolvedValueOnce(new Response('error code: 520', { status: 520 }))
-      .mockResolvedValueOnce(new Response('store blocked', { status: 403 }))
-      .mockResolvedValueOnce(new Response('error code: 520', { status: 520 }));
+      .mockResolvedValueOnce(new Response('<!doctype html>stock blocked'))
+      .mockResolvedValueOnce(new Response('store blocked', { status: 403 }));
 
     const tool = createCheckInventoryTool({ zyteApiKey: 'worker-key' });
     const result = await tool.handler({ keyword: '커피' });
@@ -59,12 +56,12 @@ describe('createCheckInventoryTool', () => {
     expect(parsed.nearbyStores).toEqual(
       expect.objectContaining({
         available: false,
-        unavailableReason: expect.stringContaining('520'),
+        unavailableReason: expect.stringContaining('비용 정책'),
         totalCount: 0,
         stores: [],
       }),
     );
-    expect(mockFetch).toHaveBeenCalledTimes(5);
+    expect(mockFetch).toHaveBeenCalledTimes(3);
   });
 
   it('매장 조회가 비 Error 값으로 실패해도 안전한 원인을 반환한다', async () => {
@@ -91,48 +88,10 @@ describe('createCheckInventoryTool', () => {
     );
   });
 
-  it('주입된 Worker 키로 폴백하고 차단된 재고를 unavailable로 반환한다', async () => {
-    const zyteBanBody = JSON.stringify({
-      type: '/download/website-ban',
-      title: 'Website Ban',
-      status: 520,
-      detail: 'Zyte API could not get a ban-free response.',
-    });
-    mockFetch
-      .mockResolvedValueOnce(new Response(JSON.stringify({ areaList: [] })))
-      .mockResolvedValueOnce(new Response('blocked', { status: 403 }))
-      .mockResolvedValueOnce(
-        new Response(zyteBanBody, {
-          status: 520,
-          headers: { 'Content-Type': 'application/json' },
-        }),
-      )
-      .mockResolvedValueOnce(new Response(JSON.stringify({ totalCnt: 0, storeList: [] })));
-
-    const tool = createCheckInventoryTool({
-      zyteApiKey: 'worker-key',
-      googleMapsApiKey: 'maps-key',
-    });
-    const result = await tool.handler({
-      keyword: '과자',
-      latitude: 37.5,
-      longitude: 127,
-      storeLimit: 1,
-    });
-
-    const parsed = JSON.parse(result.content[0].text);
-    expect(parsed.inventory).toEqual(
-      expect.objectContaining({
-        available: false,
-        unavailableReason: expect.stringContaining('Website Ban'),
-        totalCount: 0,
-        items: [],
-      }),
-    );
-    const zyteHeaders = new Headers(mockFetch.mock.calls[2][1]?.headers);
-    expect(zyteHeaders.get('Authorization')).toBe(
-      `Basic ${Buffer.from('worker-key:', 'utf8').toString('base64')}`,
-    );
+  it('키가 있어도 차단된 재고 조회에 유료 요청을 보내지 않는다', async () => {
+    mockFetch.mockResolvedValueOnce(new Response('{}')).mockResolvedValueOnce(new Response('blocked', {status:403}));
+    await expect(createCheckInventoryTool({zyteApiKey:'worker-key'}).handler({keyword:'과자',storeLimit:1})).rejects.toThrow('비용 정책');
+    expect(mockFetch).toHaveBeenCalledTimes(2);
   });
 
   it('올바른 도구 정의를 반환한다', () => {

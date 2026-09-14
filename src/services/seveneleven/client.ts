@@ -3,6 +3,7 @@
  */
 /* c8 ignore start */
 
+import { withSevenElevenReadCache } from './readCache.js';
 import { fetchJsonWithZyteFallback } from '../../utils/zyteJsonFallback.js';
 import { SEVENELEVEN_API } from './api.js';
 import type {
@@ -188,7 +189,7 @@ async function requestSevenElevenJson<T>(
   const { timeout = 15000, zyteApiKey } = options;
   const url = `${SEVENELEVEN_API.BASE_URL}${path}`;
 
-  return fetchJsonWithZyteFallback<SevenElevenApiEnvelope<T>>(url, {
+  return withSevenElevenReadCache(path, body, timeout, () => fetchJsonWithZyteFallback<SevenElevenApiEnvelope<T>>(url, {
     ...SEVENELEVEN_DEFAULT_FETCH_OPTIONS,
     method,
     retryUnsafeMethods: method === 'POST',
@@ -197,7 +198,7 @@ async function requestSevenElevenJson<T>(
     body: method === 'POST' ? JSON.stringify(body || {}) : undefined,
     zyteApiKey,
     zyteTags: { service: 'seveneleven' },
-  });
+  }));
 }
 
 export async function searchSevenElevenProducts(

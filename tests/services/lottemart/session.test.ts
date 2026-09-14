@@ -8,6 +8,7 @@ import {
   probeLotteMartRequest,
 } from '../../../src/services/lottemart/session.js';
 import {
+  toLotteMartBodyText,
   __testOnlyCreateLotteMartSocketResponse,
   __testOnlyFetchLotteMartSocketResponse,
 } from '../../../src/services/lottemart/socketTransport.js';
@@ -27,21 +28,6 @@ vi.mock('../../../src/services/lottemart/socketTransport.js', async () => {
 });
 
 const mockFetch = vi.fn();
-
-function createZyteResponse(bodyText: string, status = 200) {
-  return new Response(
-    JSON.stringify({
-      statusCode: 200,
-      httpResponseBody: Buffer.from(bodyText, 'utf8').toString('base64'),
-    }),
-    {
-      status,
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    },
-  );
-}
 
 beforeEach(() => {
   mockFetch.mockReset();
@@ -534,129 +520,6 @@ describe('lottemart session helpers', () => {
     ).rejects.toThrow('broken stream');
   });
 
-  it('direct fetch가 abort되면 Zyte로 재시도한다', async () => {
-    mockFetch
-      .mockRejectedValueOnce(new Error('The operation was aborted'))
-      .mockResolvedValueOnce(createZyteResponse('<option value="2301">강변점</option>'));
-
-    await expect(
-      fetchLotteMartHtml(
-        'https://company.lottemart.com/mobiledowa/test',
-        { method: 'GET' },
-        1000,
-        '',
-        'test-key',
-      ),
-    ).resolves.toContain('강변점');
-
-    expect(String(mockFetch.mock.calls[1]?.[0])).toBe('https://api.zyte.com/v1/extract');
-  });
-
-  it('Zyte 요청에는 URLSearchParams body를 문자열로 전달한다', async () => {
-    mockFetch
-      .mockRejectedValueOnce(new Error('The operation was aborted'))
-      .mockResolvedValueOnce(createZyteResponse('ok'));
-
-    await expect(
-      fetchLotteMartHtml(
-        'https://company.lottemart.com/mobiledowa/test',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-          },
-          body: new URLSearchParams({ keyword: '핫식스', page: '2' }),
-        },
-        1000,
-        '',
-        'test-key',
-      ),
-    ).resolves.toBe('ok');
-
-    const zyteBody = JSON.parse(String(mockFetch.mock.calls[1]?.[1]?.body)) as {
-      httpRequestText?: string;
-      customHttpRequestHeaders?: Array<{ name: string; value: string }>;
-    };
-    expect(zyteBody.httpRequestText).toBe('keyword=%ED%95%AB%EC%8B%9D%EC%8A%A4&page=2');
-    expect(zyteBody.customHttpRequestHeaders).toEqual(
-      expect.arrayContaining([
-        { name: 'content-type', value: 'application/x-www-form-urlencoded' },
-      ]),
-    );
-  });
-
-  it('Zyte 요청에는 문자열 body도 그대로 전달한다', async () => {
-    mockFetch
-      .mockRejectedValueOnce(new Error('The operation was aborted'))
-      .mockResolvedValueOnce(createZyteResponse('ok'));
-
-    await expect(
-      fetchLotteMartHtml(
-        'https://company.lottemart.com/mobiledowa/test',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-          },
-          body: 'keyword=%ED%95%AB%EC%8B%9D%EC%8A%A4&page=1',
-        },
-        1000,
-        '',
-        'test-key',
-      ),
-    ).resolves.toBe('ok');
-
-    const zyteBody = JSON.parse(String(mockFetch.mock.calls[1]?.[1]?.body)) as {
-      httpRequestText?: string;
-    };
-    expect(zyteBody.httpRequestText).toBe('keyword=%ED%95%AB%EC%8B%9D%EC%8A%A4&page=1');
-  });
-
-  it('Zyte fallback 시 method가 비어 있으면 GET으로 보낸다', async () => {
-    mockFetch
-      .mockRejectedValueOnce(new Error('The operation was aborted'))
-      .mockResolvedValueOnce(createZyteResponse('ok'));
-
-    await expect(
-      fetchLotteMartHtml(
-        'https://company.lottemart.com/mobiledowa/test',
-        {
-          headers: {
-            'X-Test': '1',
-          },
-        },
-        1000,
-        '',
-        'test-key',
-      ),
-    ).resolves.toBe('ok');
-
-    const zyteBody = JSON.parse(String(mockFetch.mock.calls[1]?.[1]?.body)) as {
-      httpRequestMethod?: string;
-    };
-    expect(zyteBody.httpRequestMethod).toBe('GET');
-  });
-
-  it('Zyte 응답 본문이 비어 있으면 에러를 던진다', async () => {
-    mockFetch.mockRejectedValueOnce(new Error('The operation was aborted')).mockResolvedValueOnce(
-      new Response(JSON.stringify({ statusCode: 200 }), {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      }),
-    );
-
-    await expect(
-      fetchLotteMartHtml(
-        'https://company.lottemart.com/mobiledowa/test',
-        { method: 'GET' },
-        1000,
-        '',
-        'test-key',
-      ),
-    ).rejects.toThrow('Zyte HTTP 응답 본문이 비어 있습니다.');
-  });
-
   it('페이지 래퍼는 절대 경로로 조합해 HTML을 가져온다', async () => {
     mockFetch.mockResolvedValue(new Response('page ok'));
 
@@ -729,66 +592,6 @@ describe('lottemart session helpers', () => {
     ]);
   });
 
-  it('probeLotteMartRequest는 Zyte 성공 시 세션 쿠키 유무를 보존한다', async () => {
-    mockFetch
-      .mockResolvedValueOnce(new Response('direct ok'))
-      .mockResolvedValueOnce(createZyteResponse('zyte ok'))
-      .mockResolvedValueOnce(new Response('direct ok'))
-      .mockResolvedValueOnce(createZyteResponse('zyte ok'));
-
-    const withCookie = await probeLotteMartRequest(
-      'https://company.lottemart.com/mobiledowa/test',
-      { method: 'GET' },
-      1000,
-      'ASPSESSIONID=PROBE',
-      'test-key',
-    );
-    const withoutCookie = await probeLotteMartRequest(
-      'https://company.lottemart.com/mobiledowa/test',
-      { method: 'GET' },
-      1000,
-      '',
-      'test-key',
-    );
-
-    expect(withCookie[1]).toEqual(
-      expect.objectContaining({
-        used: 'zyte',
-        success: true,
-        sessionCookie: 'ASPSESSIONID=PROBE',
-      }),
-    );
-    expect(withoutCookie[1]).toEqual(
-      expect.objectContaining({
-        used: 'zyte',
-        success: true,
-        sessionCookie: null,
-      }),
-    );
-  });
-
-  it('probeLotteMartRequest는 Error가 아닌 Zyte 실패도 기본 메시지로 요약한다', async () => {
-    mockFetch
-      .mockResolvedValueOnce(new Response('direct ok'))
-      .mockRejectedValueOnce('zyte unavailable');
-
-    const result = await probeLotteMartRequest(
-      'https://company.lottemart.com/mobiledowa/test',
-      { method: 'GET' },
-      1000,
-      '',
-      'test-key',
-    );
-
-    expect(result[1]).toEqual(
-      expect.objectContaining({
-        used: 'zyte',
-        success: false,
-        error: '알 수 없는 오류가 발생했습니다.',
-      }),
-    );
-  });
-
   it('probeLotteMartRequest는 direct 실패와 zyte 실패를 함께 기록한다', async () => {
     mockFetch.mockRejectedValueOnce(new Error('The operation was aborted')).mockResolvedValueOnce(
       new Response(JSON.stringify({ title: 'Website Ban', detail: 'ban', status: 520 }), {
@@ -819,4 +622,25 @@ describe('lottemart session helpers', () => {
       }),
     ]);
   });
+});
+
+it('키가 있어도 원본 실패 후 유료 요청을 보내지 않는다', async () => {
+  mockFetch.mockRejectedValue(new Error('원본 연결 실패'));
+  await expect(fetchLotteMartHtml('https://example.com/test', { method: 'GET' }, 100, '', 'remaining-key'))
+    .rejects.toThrow('비용 정책');
+  expect(mockFetch.mock.calls.every(([url]) => new URL(String(url)).hostname !== 'api.zyte.com')).toBe(true);
+});
+
+it('진단은 유료 경로 중지를 표시하고 실제 유료 호출은 하지 않는다', async () => {
+  mockFetch.mockResolvedValue(new Response('ok'));
+  const result = await probeLotteMartRequest('https://example.com/test', {}, 100, 'ASPSESSIONID=abc', 'remaining-key');
+  expect(result).toHaveLength(2);
+  expect(result[1]).toMatchObject({ used: 'zyte', success: false, status: null, sessionCookie: 'ASPSESSIONID=abc' });
+  expect(result[1].error).toContain('비용 정책');
+  expect(mockFetch).toHaveBeenCalledTimes(1);
+});
+
+it('소켓 POST 전송용 폼 본문은 URLSearchParams 인코딩을 유지한다', () => {
+  expect(toLotteMartBodyText(new URLSearchParams({ keyword: '우유', area: '서울' })))
+    .toBe('keyword=%EC%9A%B0%EC%9C%A0&area=%EC%84%9C%EC%9A%B8');
 });

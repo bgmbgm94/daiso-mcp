@@ -61,7 +61,8 @@ export async function handleOliveyoungSearchProducts(c: ApiContext) {
         includeSoldOut,
       },
       {
-        apiKey: c.env?.ZYTE_API_KEY,
+        relayUrl: c.env?.OY_RELAY_URL,
+        relayToken: c.env?.OY_RELAY_TOKEN,
         timeout: timeoutMs,
       },
     );
@@ -105,7 +106,8 @@ export async function handleOliveyoungFindStores(c: ApiContext) {
         searchWords: keyword,
       },
       {
-        apiKey: c.env?.ZYTE_API_KEY,
+        relayUrl: c.env?.OY_RELAY_URL,
+        relayToken: c.env?.OY_RELAY_TOKEN,
         timeout: timeoutMs,
       }
     );
@@ -157,7 +159,8 @@ export async function handleOliveyoungCheckInventory(c: ApiContext) {
           searchWords: storeKeyword,
         },
         {
-          apiKey: c.env.ZYTE_API_KEY,
+          relayUrl: c.env?.OY_RELAY_URL,
+          relayToken: c.env?.OY_RELAY_TOKEN,
           timeout: timeoutMs,
         }
       ),
@@ -170,7 +173,8 @@ export async function handleOliveyoungCheckInventory(c: ApiContext) {
           includeSoldOut,
         },
         {
-          apiKey: c.env.ZYTE_API_KEY,
+          relayUrl: c.env?.OY_RELAY_URL,
+          relayToken: c.env?.OY_RELAY_TOKEN,
           timeout: timeoutMs,
         }
       ),
@@ -184,7 +188,8 @@ export async function handleOliveyoungCheckInventory(c: ApiContext) {
         maxProducts: Math.min(productResult.products.length, stockCheckLimit),
       },
       {
-        apiKey: c.env.ZYTE_API_KEY,
+        relayUrl: c.env?.OY_RELAY_URL,
+        relayToken: c.env?.OY_RELAY_TOKEN,
         timeout: timeoutMs,
       }
     );

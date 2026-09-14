@@ -252,9 +252,7 @@ describe('GET /api/actions/query', () => {
   it('올리브영 상품 검색을 action facade로 위임한다', async () => {
     mockFetch.mockResolvedValue(
       new Response(
-        JSON.stringify({
-          statusCode: 200,
-          httpResponseBody: Buffer.from(
+        Buffer.from(
             JSON.stringify({
               status: 'SUCCESS',
               data: {
@@ -271,8 +269,7 @@ describe('GET /api/actions/query', () => {
               },
             }),
             'utf8',
-          ).toString('base64'),
-        }),
+          ).toString('utf8'),
       ),
     );
 

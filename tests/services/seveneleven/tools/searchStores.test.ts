@@ -1,3 +1,4 @@
+import { clearSevenElevenReadCache } from '../../../../src/services/seveneleven/readCache.js';
 /**
  * 세븐일레븐 매장 검색 도구 테스트
  */
@@ -8,6 +9,7 @@ import { createSearchStoresTool } from '../../../../src/services/seveneleven/too
 const mockFetch = vi.fn();
 
 beforeEach(() => {
+  clearSevenElevenReadCache();
   mockFetch.mockReset();
   vi.stubGlobal('fetch', mockFetch);
 });
@@ -27,7 +29,9 @@ describe('createSearchStoresTool', () => {
   it('keyword가 없으면 에러를 던진다', async () => {
     const tool = createSearchStoresTool();
 
-    await expect(tool.handler({ keyword: '' })).rejects.toThrow('매장 검색어(keyword)를 입력해주세요.');
+    await expect(tool.handler({ keyword: '' })).rejects.toThrow(
+      '매장 검색어(keyword)를 입력해주세요.',
+    );
   });
 
   it('매장 검색 결과를 반환한다', async () => {
@@ -92,46 +96,12 @@ describe('createSearchStoresTool', () => {
     );
   });
 
-  it('주입된 Zyte 키로 차단된 매장 API를 복구한다', async () => {
-    const payload = {
-      success: true,
-      data: {
-        SearchQueryResult: {
-          query: '강남',
-          Collection: [
-            {
-              CollectionId: 'store',
-              Documentset: {
-                totalCount: 1,
-                Document: [{ field: { storeCd: '1', storeNm: '강남점', addr1: '서울 강남구' } }],
-              },
-            },
-          ],
-        },
-      },
-    };
-    mockFetch
-      .mockResolvedValueOnce(new Response('blocked', { status: 403 }))
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            statusCode: 200,
-            httpResponseBody: Buffer.from(JSON.stringify(payload)).toString('base64'),
-          }),
-        ),
-      );
-
-    const result = await createSearchStoresTool('worker-key').handler({ keyword: '강남' });
-
-    expect(JSON.parse(result.content[0].text).count).toBe(1);
-    expect(mockFetch).toHaveBeenNthCalledWith(
-      2,
-      'https://api.zyte.com/v1/extract',
-      expect.objectContaining({
-        headers: expect.objectContaining({
-          Authorization: `Basic ${Buffer.from('worker-key:').toString('base64')}`,
-        }),
-      }),
+  it('키가 있어도 차단된 매장 요청에 유료 호출을 보내지 않는다', async () => {
+    mockFetch.mockResolvedValueOnce(new Response('blocked', { status: 403 }));
+    await expect(createSearchStoresTool('worker-key').handler({ keyword: '강남' })).rejects.toThrow(
+      '비용 정책',
     );
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(mockFetch.mock.calls.some(([url]) => new URL(String(url)).hostname === 'api.zyte.com')).toBe(false);
   });
 });

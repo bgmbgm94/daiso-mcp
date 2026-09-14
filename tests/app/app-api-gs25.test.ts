@@ -32,33 +32,13 @@ describe('GET /api/gs25/stores', () => {
     expect(data.data.stores).toHaveLength(1);
   });
 
-  it('GS25 매장 검색 403이면 Zyte fallback을 사용한다', async () => {
-    const zyteBody = Buffer.from(
-      JSON.stringify({
-        stores: [{ storeCode: '1', storeName: '강남역점', storeAddress: '서울 강남구' }],
-      }),
-      'utf8',
-    ).toString('base64');
-
-    mockFetch
-      .mockResolvedValueOnce(new Response('forbidden', { status: 403, statusText: 'Forbidden' }))
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            statusCode: 200,
-            httpResponseBody: zyteBody,
-          }),
-        ),
-      );
-
-    const res = await app.request('/api/gs25/stores?keyword=강남', undefined, {
-      ZYTE_API_KEY: 'test-zyte-key',
-    });
-    expect(res.status).toBe(200);
-
-    const data = await res.json();
-    expect(data.success).toBe(true);
-    expect(data.data.stores).toHaveLength(1);
+  it('GS25 매장 검색 차단 시 유료 호출 없이 인증 장애를 반환한다', async () => {
+    mockFetch.mockResolvedValueOnce(new Response('blocked', { status: 403 }));
+    const res = await app.request('/api/gs25/stores', undefined, { ZYTE_API_KEY: 'test-key' });
+    expect(res.status).toBe(500);
+    const result = await res.json();
+    expect(result.diagnostics.retryable).toBe(false);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 });
 

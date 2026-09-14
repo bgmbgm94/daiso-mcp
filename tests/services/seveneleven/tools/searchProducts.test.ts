@@ -1,3 +1,4 @@
+import { clearSevenElevenReadCache } from '../../../../src/services/seveneleven/readCache.js';
 /**
  * 세븐일레븐 상품 검색 도구 테스트
  */
@@ -8,6 +9,7 @@ import { createSearchProductsTool } from '../../../../src/services/seveneleven/t
 const mockFetch = vi.fn();
 
 beforeEach(() => {
+  clearSevenElevenReadCache();
   mockFetch.mockReset();
   vi.stubGlobal('fetch', mockFetch);
 });
@@ -164,48 +166,15 @@ describe('createSearchProductsTool', () => {
     });
   });
 
-  it('주입된 Zyte 키로 차단된 상품 API를 복구한다', async () => {
-    const zytePayload = {
-      success: true,
-      data: {
-        SearchQueryResult: {
-          query: '커피',
-          Collection: [
-            {
-              CollectionId: 'offline',
-              Documentset: {
-                totalCount: 1,
-                Document: [{ prdNo: '1', itemCd: '8801', itemOnm: '아메리카노' }],
-              },
-            },
-          ],
-        },
-      },
-    };
-    mockFetch
-      .mockResolvedValueOnce(new Response('blocked', { status: 403 }))
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            statusCode: 200,
-            httpResponseBody: Buffer.from(JSON.stringify(zytePayload)).toString('base64'),
-          }),
-        ),
-      );
-
-    const tool = createSearchProductsTool('worker-key');
-    const result = await tool.handler({ query: '커피', size: 1 });
-
-    expect(result.structuredContent).toMatchObject({ query: '커피', count: 1 });
-    expect(mockFetch).toHaveBeenNthCalledWith(
-      2,
-      'https://api.zyte.com/v1/extract',
-      expect.objectContaining({
-        headers: expect.objectContaining({
-          Authorization: `Basic ${Buffer.from('worker-key:').toString('base64')}`,
-        }),
-      }),
-    );
+  it('키가 있어도 상품 차단 시 비용 정책을 포함한 degraded 결과를 반환한다', async () => {
+    mockFetch.mockResolvedValueOnce(new Response('blocked', { status: 403 }));
+    const result = await createSearchProductsTool('worker-key').handler({ query: '커피', size: 1 });
+    expect(result.structuredContent).toMatchObject({
+      count: 0,
+      status: 'degraded',
+      message: expect.stringContaining('비용 정책'),
+    });
+    expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 
   it('비 Error 예외도 output schema를 만족하는 degraded 응답으로 변환한다', async () => {
@@ -234,7 +203,9 @@ describe('createSearchProductsTool', () => {
             data: {
               SearchQueryResult: {
                 query: '후르츠산도',
-                Collection: [{ CollectionId: 'offline', Documentset: { totalCount: 0, Document: [] } }],
+                Collection: [
+                  { CollectionId: 'offline', Documentset: { totalCount: 0, Document: [] } },
+                ],
               },
             },
           }),
@@ -309,7 +280,9 @@ describe('createSearchProductsTool', () => {
             data: {
               SearchQueryResult: {
                 query: '후르츠샌드위치',
-                Collection: [{ CollectionId: 'offline', Documentset: { totalCount: 0, Document: [] } }],
+                Collection: [
+                  { CollectionId: 'offline', Documentset: { totalCount: 0, Document: [] } },
+                ],
               },
             },
           }),
@@ -322,7 +295,9 @@ describe('createSearchProductsTool', () => {
             data: {
               SearchQueryResult: {
                 query: '후르츠샌드',
-                Collection: [{ CollectionId: 'offline', Documentset: { totalCount: 0, Document: [] } }],
+                Collection: [
+                  { CollectionId: 'offline', Documentset: { totalCount: 0, Document: [] } },
+                ],
               },
             },
           }),

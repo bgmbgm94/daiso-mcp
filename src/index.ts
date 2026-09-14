@@ -112,7 +112,8 @@ const createRegistry = (bindings?: AppBindings) => {
       }),
     () =>
       createOliveyoungService({
-        zyteApiKey: bindings?.ZYTE_API_KEY,
+        relayUrl: bindings?.OY_RELAY_URL,
+        relayToken: bindings?.OY_RELAY_TOKEN,
       }),
   ]);
 

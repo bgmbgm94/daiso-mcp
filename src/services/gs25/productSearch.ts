@@ -4,7 +4,7 @@
 /* c8 ignore start */
 
 import { fetchJson, HttpError } from '../../utils/http.js';
-import { decodeZyteHttpBody, requestByZyte } from '../../utils/zyte.js';
+import { requestByZyte } from '../../utils/zyte.js';
 import { GS25_API } from './api.js';
 import { toNumber } from './storeUtils.js';
 
@@ -87,20 +87,7 @@ async function fetchGs25TotalSearchResponse(
       throw error;
     }
 
-    const result = await requestByZyte({
-      apiKey: zyteApiKey,
-      url: endpoint.toString(),
-      method: 'POST',
-      timeout,
-      retries: 1,
-      headers: Object.entries(GS25_TOTAL_SEARCH_HEADERS).map(([name, value]) => ({
-        name,
-        value,
-      })),
-      bodyText,
-      tags: { service: 'gs25' },
-    });
-    return decodeZyteHttpBody<Gs25TotalSearchResponse>(result);
+    return requestByZyte({ apiKey: zyteApiKey, url: endpoint.toString() });
   }
 }
 

@@ -3,6 +3,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { toStandardErrorDiagnostics } from '../../../src/core/errors.js';
 import { CgvUpstreamUnavailableError } from '../../../src/services/cgv/errors.js';
 import { requestCgv } from '../../../src/services/cgv/transport.js';
 
@@ -50,33 +51,18 @@ describe('requestCgv', () => {
     ).rejects.toThrow('CGV API 응답 파싱 실패');
   });
 
-  it('403 + zyteApiKey면 Zyte fallback을 사용한다', async () => {
-    const body = Buffer.from(
-      JSON.stringify({ statusCode: 0, data: [{ siteNo: '0056' }] }),
-      'utf8',
-    ).toString('base64');
-
-    mockFetch
-      .mockResolvedValueOnce(new Response('forbidden', { status: 403 }))
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            statusCode: 200,
-            httpResponseBody: body,
-          }),
-          { status: 200 },
-        ),
-      );
-
-    const result = await requestCgv<{ statusCode: number; data: Array<{ siteNo: string }> }>(
-      '/cnm/atkt/searchRegnList',
-      new URLSearchParams({ coCd: 'A420' }),
-      1000,
-      'test-key',
-    );
-
-    expect(result.data[0].siteNo).toBe('0056');
-    expect(String(mockFetch.mock.calls[1][0])).toContain('https://api.zyte.com/v1/extract');
+  it('키가 있어도 403이면 유료 호출 없이 서비스 이용 불가를 알린다', async () => {
+    mockFetch.mockResolvedValueOnce(new Response('blocked', { status: 403 }));
+    await expect(
+      requestCgv(
+        '/cnm/atkt/searchRegnList',
+        new URLSearchParams({ coCd: 'A420' }),
+        1000,
+        'test-key',
+      ),
+    ).rejects.toThrow('CGV');
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(mockFetch.mock.calls.some(([url]) => new URL(String(url)).hostname === 'api.zyte.com')).toBe(false);
   });
 
   it('직접 요청이 403이고 Zyte 키가 없으면 명시적인 upstream unavailable 오류를 던진다', async () => {
@@ -93,58 +79,6 @@ describe('requestCgv', () => {
     await expect(
       requestCgv('/cnm/atkt/searchRegnList', new URLSearchParams({ coCd: 'A420' }), 1000),
     ).rejects.toBeInstanceOf(CgvUpstreamUnavailableError);
-  });
-
-  it.each([401, 403])(
-    'Zyte 대상 응답이 %i이면 명시적인 upstream unavailable 오류를 던진다',
-    async (statusCode) => {
-      mockFetch
-        .mockResolvedValueOnce(new Response('forbidden', { status: 403 }))
-        .mockResolvedValueOnce(
-          new Response(
-            JSON.stringify({
-              statusCode,
-              httpResponseBody: Buffer.from('forbidden').toString('base64'),
-            }),
-            { status: 200 },
-          ),
-        );
-
-      await expect(
-        requestCgv(
-          '/cnm/atkt/searchRegnList',
-          new URLSearchParams({ coCd: 'A420' }),
-          1000,
-          'test-key',
-        ),
-      ).rejects.toBeInstanceOf(CgvUpstreamUnavailableError);
-    },
-  );
-
-  it('Zyte 계정이 중지된 경우 원문 대신 명시적인 upstream unavailable 오류를 던진다', async () => {
-    mockFetch
-      .mockResolvedValueOnce(new Response('forbidden', { status: 403 }))
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            title: 'Forbidden',
-            detail: 'account suspended',
-          }),
-          { status: 403 },
-        ),
-      );
-
-    await expect(
-      requestCgv(
-        '/cnm/atkt/searchRegnList',
-        new URLSearchParams({ coCd: 'A420' }),
-        1000,
-        'test-key',
-      ),
-    ).rejects.toMatchObject({
-      name: 'CgvUpstreamUnavailableError',
-      message: expect.not.stringContaining('account suspended'),
-    });
   });
 
   it('AbortError는 시간 초과 에러로 변환한다', async () => {
@@ -186,4 +120,17 @@ describe('requestCgv', () => {
       requestCgv('/cnm/atkt/searchRegnList', new URLSearchParams({ coCd: 'A420' }), 1000),
     ).rejects.toThrow('Base64 인코딩을 지원하지 않는 런타임입니다.');
   });
+});
+
+it('CGV 인증 차단은 비용 정책 안내와 함께 재시도 불가로 진단한다', async () => {
+  mockFetch.mockResolvedValueOnce(new Response('blocked', { status: 403 }));
+  const error = await requestCgv('/test', new URLSearchParams(), 1000, 'test-key').catch(
+    (error: Error) => error,
+  );
+  expect(error).toBeInstanceOf(CgvUpstreamUnavailableError);
+  expect(
+    toStandardErrorDiagnostics('CGV_UPSTREAM_UNAVAILABLE', (error as Error).message, {
+      status: 503,
+    }),
+  ).toMatchObject({ retryable: false, hint: expect.stringContaining('비용 정책') });
 });
