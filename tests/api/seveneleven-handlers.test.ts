@@ -1,3 +1,4 @@
+import { clearSevenElevenReadCache } from '../../src/services/seveneleven/readCache.js';
 /**
  * 세븐일레븐 API 핸들러 테스트
  */
@@ -14,6 +15,7 @@ import {
 const mockFetch = vi.fn();
 
 beforeEach(() => {
+  clearSevenElevenReadCache();
   mockFetch.mockReset();
   vi.stubGlobal('fetch', mockFetch);
 });
@@ -22,10 +24,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-function createMockContext(
-  query: Record<string, string> = {},
-  env: Record<string, string> = {},
-) {
+function createMockContext(query: Record<string, string> = {}, env: Record<string, string> = {}) {
   return {
     env,
     req: {
@@ -87,53 +86,21 @@ describe('handleSevenElevenSearchProducts', () => {
     );
   });
 
-  it('원본 API가 차단되면 Worker Zyte 키로 상품을 조회한다', async () => {
-    const zytePayload = {
-      success: true,
-      data: {
-        SearchQueryResult: {
-          query: '삼각김밥',
-          Collection: [
-            {
-              CollectionId: 'offline',
-              Documentset: {
-                totalCount: 1,
-                Document: [{ prdNo: '1', itemCd: '8801', itemOnm: '참치마요' }],
-              },
-            },
-          ],
-        },
-      },
-    };
-    mockFetch
-      .mockResolvedValueOnce(new Response('blocked', { status: 403 }))
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            statusCode: 200,
-            httpResponseBody: Buffer.from(JSON.stringify(zytePayload)).toString('base64'),
-          }),
-        ),
-      );
-
+  it('Worker 키가 있어도 차단 시 유료 호출 없이 비용 정책 오류를 반환한다', async () => {
+    mockFetch.mockResolvedValueOnce(new Response('blocked', { status: 403 }));
     const ctx = createMockContext({ query: '삼각김밥' }, { ZYTE_API_KEY: 'worker-key' });
     await handleSevenElevenSearchProducts(ctx);
-
     expect(ctx.json).toHaveBeenCalledWith(
       expect.objectContaining({
-        success: true,
-        data: expect.objectContaining({ count: 1 }),
-      }),
-    );
-    expect(mockFetch).toHaveBeenNthCalledWith(
-      2,
-      'https://api.zyte.com/v1/extract',
-      expect.objectContaining({
-        headers: expect.objectContaining({
-          Authorization: `Basic ${Buffer.from('worker-key:').toString('base64')}`,
+        success: false,
+        diagnostics: expect.objectContaining({
+          retryable: false,
+          hint: expect.stringContaining('비용 정책'),
         }),
       }),
+      500,
     );
+    expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -164,7 +131,11 @@ describe('handleSevenElevenSearchStores', () => {
                   CollectionId: 'store',
                   Documentset: {
                     totalCount: 1,
-                    Document: [{ field: { storCd: '54928', storNm: '안산중앙일번가점', addr: '경기 안산시' } }],
+                    Document: [
+                      {
+                        field: { storCd: '54928', storNm: '안산중앙일번가점', addr: '경기 안산시' },
+                      },
+                    ],
                   },
                 },
               ],
@@ -291,7 +262,11 @@ describe('handleSevenElevenCheckInventory', () => {
         ),
       );
 
-    const ctx = createMockContext({ keyword: '핫식스', storeKeyword: '안산 중앙역', storeLimit: '10' });
+    const ctx = createMockContext({
+      keyword: '핫식스',
+      storeKeyword: '안산 중앙역',
+      storeLimit: '10',
+    });
     await handleSevenElevenCheckInventory(ctx);
 
     expect(ctx.json).toHaveBeenCalledWith(

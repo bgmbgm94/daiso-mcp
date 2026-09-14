@@ -49,38 +49,11 @@ describe('fetchCgvTheaters', () => {
     expect(result[0]).toEqual({ theaterCode: '0056', theaterName: '강남', regionCode: '01' });
   });
 
-  it('403이면 Zyte fallback을 사용한다', async () => {
-    const zyteBody = Buffer.from(
-      JSON.stringify({
-        statusCode: 0,
-        statusMessage: '조회 되었습니다.',
-        data: [
-          {
-            regnGrpCd: '01',
-            regnGrpNm: '서울',
-            siteList: [{ siteNo: '0056', siteNm: '강남' }],
-          },
-        ],
-      }),
-      'utf8',
-    ).toString('base64');
-
-    mockFetch
-      .mockResolvedValueOnce(new Response('forbidden', { status: 403 }))
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            statusCode: 200,
-            httpResponseBody: zyteBody,
-          }),
-        ),
-      );
-
-    const result = await fetchCgvTheaters({ zyteApiKey: 'test-key' });
-
-    expect(result).toHaveLength(1);
-    expect(result[0].theaterCode).toBe('0056');
-    expect(mockFetch).toHaveBeenCalledTimes(2);
+  it('403이면 유료 호출 없이 서비스 이용 불가를 알린다', async () => {
+    mockFetch.mockResolvedValueOnce(new Response('blocked', { status: 403 }));
+    await expect(fetchCgvTheaters({ zyteApiKey: 'test-key' })).rejects.toThrow('CGV');
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(mockFetch.mock.calls.some(([url]) => String(url).includes('api.zyte.com'))).toBe(false);
   });
 
   it('HTTP 에러를 처리한다', async () => {

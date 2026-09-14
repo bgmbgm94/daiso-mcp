@@ -1,3 +1,4 @@
+import type { OliveyoungRequestOptions } from '../transport.js';
 /**
  * 올리브영 재고 파악 도구
  */
@@ -25,7 +26,7 @@ interface CheckInventoryArgs {
   zyteApiKey?: string;
 }
 
-async function checkInventory(args: CheckInventoryArgs): Promise<McpToolResponse> {
+async function checkInventory(args: CheckInventoryArgs, transport: OliveyoungRequestOptions): Promise<McpToolResponse> {
   const {
     keyword,
     latitude = 37.5665,
@@ -56,6 +57,7 @@ async function checkInventory(args: CheckInventoryArgs): Promise<McpToolResponse
       {
         timeout: timeoutMs,
         apiKey: zyteApiKey,
+      ...transport,
       }
     ),
     fetchOliveyoungProducts(
@@ -69,6 +71,7 @@ async function checkInventory(args: CheckInventoryArgs): Promise<McpToolResponse
       {
         timeout: timeoutMs,
         apiKey: zyteApiKey,
+      ...transport,
       }
     ),
   ]);
@@ -83,6 +86,7 @@ async function checkInventory(args: CheckInventoryArgs): Promise<McpToolResponse
     {
       timeout: timeoutMs,
       apiKey: zyteApiKey,
+      ...transport,
     }
   );
 
@@ -122,7 +126,7 @@ async function checkInventory(args: CheckInventoryArgs): Promise<McpToolResponse
   };
 }
 
-export function createCheckInventoryTool(apiKey?: string): ToolRegistration {
+export function createCheckInventoryTool(apiKey?: string, transport: OliveyoungRequestOptions = {}): ToolRegistration {
   return {
     name: 'oliveyoung_check_inventory',
     metadata: {
@@ -151,6 +155,6 @@ export function createCheckInventoryTool(apiKey?: string): ToolRegistration {
       },
     },
     handler: ((args: CheckInventoryArgs) =>
-      checkInventory({ ...args, zyteApiKey: apiKey })) as (args: unknown) => Promise<McpToolResponse>,
+      checkInventory({ ...args, zyteApiKey: apiKey }, transport)) as (args: unknown) => Promise<McpToolResponse>,
   };
 }

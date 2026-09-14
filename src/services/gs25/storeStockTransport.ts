@@ -3,7 +3,6 @@
  */
 
 import { fetchJson, HttpError } from '../../utils/http.js';
-import { decodeZyteHttpBody, requestByZyte } from '../../utils/zyte.js';
 import { Gs25UpstreamUnavailableError } from './errors.js';
 import type { Gs25StoreStockResponse } from './types.js';
 
@@ -42,30 +41,6 @@ export async function fetchGs25StoreStockResponse(
       throw error;
     }
 
-    const zyteApiKey = options.zyteApiKey?.trim();
-    if (error.status === 401 || !zyteApiKey) {
-      throw new Gs25UpstreamUnavailableError();
-    }
-
-    try {
-      const result = await requestByZyte({
-        apiKey: zyteApiKey,
-        url,
-        method: 'GET',
-        timeout: options.timeout,
-        retries: 1,
-        headers: Object.entries(requestHeaders).map(([name, value]) => ({ name, value })),
-        tags: { service: 'gs25' },
-      });
-      if (isAuthenticationStatus(result.statusCode)) {
-        throw new Gs25UpstreamUnavailableError();
-      }
-      return decodeZyteHttpBody<Gs25StoreStockResponse>(result);
-    } catch (fallbackError) {
-      if (fallbackError instanceof Gs25UpstreamUnavailableError) {
-        throw fallbackError;
-      }
-      throw new Gs25UpstreamUnavailableError();
-    }
+    throw new Gs25UpstreamUnavailableError();
   }
 }

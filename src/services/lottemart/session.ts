@@ -3,11 +3,10 @@
  */
 
 import { HttpError, fetchWithTimeout } from '../../utils/http.js';
-import { decodeBase64, requestByZyte } from '../../utils/zyte.js';
+import { ZYTE_COST_POLICY_MESSAGE } from '../../core/errors.js';
 import { LOTTEMART_API } from './api.js';
 import {
   fetchLotteMartSocketResponse,
-  toLotteMartBodyText,
   withLotteMartSessionCookie,
 } from './socketTransport.js';
 
@@ -116,41 +115,6 @@ async function fetchLotteMartResponse(
   }
 }
 
-function toZyteHeaders(headers: Headers): Array<{ name: string; value: string }> {
-  return Array.from(headers.entries()).map(([name, value]) => ({ name, value }));
-}
-
-async function fetchLotteMartHtmlByZyte(
-  url: string,
-  init: RequestInit,
-  timeout: number,
-  sessionCookie: string,
-  zyteApiKey: string,
-): Promise<string> {
-  const headers = withLotteMartSessionCookie(
-    {
-      Accept: 'text/html, */*; q=0.01',
-      ...init.headers,
-    },
-    sessionCookie,
-  );
-  const result = await requestByZyte({
-    apiKey: zyteApiKey,
-    url,
-    timeout,
-    method: (init.method as 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | undefined) || 'GET',
-    headers: toZyteHeaders(headers),
-    bodyText: toLotteMartBodyText(init.body),
-    tags: { service: 'lottemart' },
-  });
-
-  if (!result.httpResponseBody) {
-    throw new Error('Zyte HTTP 응답 본문이 비어 있습니다.');
-  }
-
-  return decodeBase64(result.httpResponseBody);
-}
-
 function toBodyPreview(bodyText: string): string | null {
   const normalized = bodyText.trim().replace(/\s+/g, ' ');
   return normalized.length > 0 ? normalized.slice(0, 300) : null;
@@ -192,34 +156,15 @@ export async function probeLotteMartRequest(
   }
 
   if (zyteApiKey) {
-    try {
-      const bodyText = await fetchLotteMartHtmlByZyte(
-        url,
-        init,
-        timeout,
-        sessionCookie,
-        zyteApiKey,
-      );
-      attempts.push({
-        used: 'zyte',
-        success: true,
-        status: 200,
-        statusText: 'OK',
-        error: null,
-        bodyPreview: toBodyPreview(bodyText),
-        sessionCookie: sessionCookie || null,
-      });
-    } catch (error) {
-      attempts.push({
-        used: 'zyte',
-        success: false,
-        status: null,
-        statusText: null,
-        error: error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.',
-        bodyPreview: null,
-        sessionCookie: sessionCookie || null,
-      });
-    }
+    attempts.push({
+      used: 'zyte',
+      success: false,
+      status: null,
+      statusText: null,
+      error: ZYTE_COST_POLICY_MESSAGE,
+      bodyPreview: null,
+      sessionCookie: sessionCookie || null,
+    });
   }
 
   return attempts;
@@ -273,14 +218,7 @@ export async function fetchLotteMartHtml(
     return bodyText;
   } catch (error) {
     if (zyteApiKey && error instanceof Error && !error.message.includes('Zyte')) {
-      const fallbackCookie = await getCachedLotteMartSessionCookie(timeout);
-      return fetchLotteMartHtmlByZyte(
-        url,
-        init,
-        Math.min(timeout, FALLBACK_TIMEOUT_MS),
-        fallbackCookie || sessionCookie,
-        zyteApiKey,
-      );
+      throw new Error(ZYTE_COST_POLICY_MESSAGE);
     }
 
     throw error;

@@ -4,6 +4,8 @@
 
 export interface FetchOptions extends RequestInit {
   timeout?: number;
+  /** fetchJson에서 허용할 정확한 HTTP 상태입니다. 생략하면 모든 2xx를 허용합니다. */
+  expectedStatus?: number;
   retries?: number;
   retryDelayMs?: number;
   retryStatusCodes?: number[];
@@ -120,6 +122,7 @@ async function requestWithTimeout<T>(
     retryUnsafeMethods = false,
     retryMethods = DEFAULT_RETRY_METHODS,
     onRetry,
+    expectedStatus: _expectedStatus,
     ...restOptions
   } = options;
   const maxAttempts = Math.max(1, Math.trunc(retries) + 1);
@@ -197,7 +200,7 @@ async function readTextResponse(url: string, options: FetchOptions) {
 export async function fetchJson<T>(url: string, options: FetchOptions = {}): Promise<T> {
   const { response, body } = await readTextResponse(url, options);
 
-  if (!response.ok) {
+  if (!response.ok || (options.expectedStatus !== undefined && response.status !== options.expectedStatus)) {
     throw new HttpError(response.status, response.statusText, body);
   }
 

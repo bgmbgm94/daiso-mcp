@@ -1,12 +1,11 @@
 /**
- * 올리브영 Zyte 클라이언트
+ * 올리브영 무료 API 클라이언트
  *
- * Zyte extract API를 통해 올리브영 내부 API를 우회 호출합니다.
+ * 공식 API 또는 운영자가 설정한 브라우저 릴레이를 호출합니다.
  */
 
 import { OLIVEYOUNG_API } from './api.js';
 import type {
-  OliveyoungApiResponse,
   OliveyoungProduct,
   OliveyoungProductStoreInventory,
   OliveyoungStore,
@@ -16,12 +15,7 @@ import {
   resolveOliveyoungInStock,
   resolveOliveyoungStoreStock,
 } from './normalize.js';
-import { decodeBase64, requestByZyte } from '../../utils/zyte.js';
-
-interface RequestOptions {
-  apiKey?: string;
-  timeout?: number;
-}
+import { requestOliveyoung, type OliveyoungRequestOptions as RequestOptions } from './transport.js';
 
 interface FindStoresParams {
   latitude: number;
@@ -127,48 +121,6 @@ function writeStaleResult<TResult>(
   });
 }
 
-async function zyteExtract(
-  targetPath: string,
-  requestBody: Record<string, unknown>,
-  options: RequestOptions = {}
-): Promise<OliveyoungApiResponse> {
-  const { timeout = 15000, apiKey } = options;
-
-  try {
-    const result = await requestByZyte({
-      apiKey,
-      timeout,
-      url: `${OLIVEYOUNG_API.BASE_URL}${targetPath}`,
-      method: 'POST',
-      headers: [
-        { name: 'Content-Type', value: 'application/json' },
-        { name: 'Accept', value: 'application/json' },
-        { name: 'X-Requested-With', value: 'XMLHttpRequest' },
-      ],
-      bodyText: JSON.stringify(requestBody),
-      tags: { service: 'oliveyoung' },
-    });
-
-    if (result.statusCode !== 200 || !result.httpResponseBody) {
-      throw new Error(`올리브영 API 응답 실패: ${result.statusCode || 'unknown'}`);
-    }
-
-    const decodedBody = decodeBase64(result.httpResponseBody);
-    const parsedBody = JSON.parse(decodedBody) as OliveyoungApiResponse;
-
-    if (parsedBody.status !== 'SUCCESS') {
-      throw new Error(`올리브영 API 상태 오류: ${parsedBody.status || 'UNKNOWN'}`);
-    }
-
-    return parsedBody;
-  } catch (error) {
-    if (error instanceof Error && error.name === 'AbortError') {
-      throw new Error('올리브영 API 요청 시간 초과');
-    }
-    throw error;
-  }
-}
-
 export async function fetchOliveyoungStores(
   params: FindStoresParams,
   options: RequestOptions = {}
@@ -186,7 +138,7 @@ export async function fetchOliveyoungStores(
   const cacheKey = createOliveyoungStoreSearchCacheKey(params);
 
   try {
-    const body = await zyteExtract(OLIVEYOUNG_API.STORE_FINDER_PATH, payload, options);
+    const body = await requestOliveyoung(OLIVEYOUNG_API.STORE_FINDER_PATH, payload, options);
 
     const stores = (body.data?.storeList || []).map((store) => ({
       storeCode: store.storeCode || '',
@@ -227,7 +179,7 @@ export async function fetchOliveyoungProducts(
   const cacheKey = createOliveyoungProductSearchCacheKey(params);
 
   try {
-    const body = await zyteExtract(OLIVEYOUNG_API.PRODUCT_SEARCH_PATH, payload, options);
+    const body = await requestOliveyoung(OLIVEYOUNG_API.PRODUCT_SEARCH_PATH, payload, options);
     const list = body.data?.serachList || body.data?.searchList || [];
 
     const products = list.map((product) => {
@@ -283,7 +235,7 @@ async function fetchOliveyoungProductId(
     return cached.productId;
   }
 
-  const body = await zyteExtract(
+  const body = await requestOliveyoung(
     OLIVEYOUNG_API.STOCK_GOODS_INFO_PATH,
     { goodsNo: normalizedGoodsNumber },
     options
@@ -307,7 +259,7 @@ async function fetchOliveyoungStockStores(
   const cacheKey = createOliveyoungStockStoresCacheKey(params);
 
   try {
-    const body = await zyteExtract(
+    const body = await requestOliveyoung(
       OLIVEYOUNG_API.STOCK_STORES_PATH,
       {
         productId: params.productId,

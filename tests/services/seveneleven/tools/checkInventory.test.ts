@@ -1,3 +1,4 @@
+import { clearSevenElevenReadCache } from '../../../../src/services/seveneleven/readCache.js';
 /**
  * 세븐일레븐 재고 확인 도구 테스트
  */
@@ -8,6 +9,7 @@ import { createCheckInventoryTool } from '../../../../src/services/seveneleven/t
 const mockFetch = vi.fn();
 
 beforeEach(() => {
+  clearSevenElevenReadCache();
   mockFetch.mockReset();
   vi.stubGlobal('fetch', mockFetch);
 });
@@ -117,13 +119,17 @@ describe('createCheckInventoryTool', () => {
   it('keyword가 없으면 에러를 던진다', async () => {
     const tool = createCheckInventoryTool();
 
-    await expect(tool.handler({ keyword: '' })).rejects.toThrow('상품 검색어(keyword)를 입력해주세요.');
+    await expect(tool.handler({ keyword: '' })).rejects.toThrow(
+      '상품 검색어(keyword)를 입력해주세요.',
+    );
   });
 
   it('공백만 있는 keyword도 에러를 던진다', async () => {
     const tool = createCheckInventoryTool();
 
-    await expect(tool.handler({ keyword: '   ' })).rejects.toThrow('상품 검색어(keyword)를 입력해주세요.');
+    await expect(tool.handler({ keyword: '   ' })).rejects.toThrow(
+      '상품 검색어(keyword)를 입력해주세요.',
+    );
   });
 
   it('재고 API 실패 시 상품/매장 정보를 함께 반환한다', async () => {
@@ -248,9 +254,7 @@ describe('createCheckInventoryTool', () => {
           },
         ]),
       )
-      .mockResolvedValueOnce(
-        makeStockProductMetaResponse(),
-      )
+      .mockResolvedValueOnce(makeStockProductMetaResponse())
       .mockResolvedValueOnce(
         makeStockSuccessResponse([
           {
@@ -276,22 +280,20 @@ describe('createCheckInventoryTool', () => {
   });
 
   it('상품이 검색되지 않으면 product가 null이다', async () => {
-    mockFetch
-      .mockResolvedValueOnce(makeProductResponse([]))
-      .mockResolvedValueOnce(
-        makeStoreResponse([
-          {
-            field: {
-              storeCd: '54928',
-              storeNm: '안산중앙일번가점',
-              addr1: '경기 안산시 단원구',
-              addr2: '',
-              storeLat: '37.3156',
-              storeLon: '126.8384',
-            },
+    mockFetch.mockResolvedValueOnce(makeProductResponse([])).mockResolvedValueOnce(
+      makeStoreResponse([
+        {
+          field: {
+            storeCd: '54928',
+            storeNm: '안산중앙일번가점',
+            addr1: '경기 안산시 단원구',
+            addr2: '',
+            storeLat: '37.3156',
+            storeLon: '126.8384',
           },
-        ]),
-      );
+        },
+      ]),
+    );
 
     const tool = createCheckInventoryTool();
     const result = await tool.handler({ keyword: '존재하지않는상품xyz', storeKeyword: '안산' });
@@ -392,9 +394,7 @@ describe('createCheckInventoryTool', () => {
           },
         ]),
       )
-      .mockResolvedValueOnce(
-        makeStoreResponse([]),
-      )
+      .mockResolvedValueOnce(makeStoreResponse([]))
       .mockResolvedValueOnce(makeStockProductMetaResponse());
 
     const tool = createCheckInventoryTool();
@@ -477,16 +477,7 @@ describe('createCheckInventoryTool', () => {
     );
   });
 
-  it('주입된 Zyte 키로 차단된 실재고 API를 복구한다', async () => {
-    const stockPayload = {
-      success: true,
-      data: {
-        smCd: '201051',
-        storeList: [{ storeCd: '54928', stock: 4, stokMngQty: 0 }],
-      },
-      message: '성공',
-      code: 200,
-    };
+  it('키가 있어도 실재고 차단 시 유료 호출 없이 조회 불가를 반환한다', async () => {
     mockFetch
       .mockResolvedValueOnce(
         makeProductResponse([
@@ -512,30 +503,15 @@ describe('createCheckInventoryTool', () => {
         ]),
       )
       .mockResolvedValueOnce(makeStockProductMetaResponse())
-      .mockResolvedValueOnce(new Response('blocked', { status: 403 }))
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            statusCode: 200,
-            httpResponseBody: Buffer.from(JSON.stringify(stockPayload)).toString('base64'),
-          }),
-        ),
-      );
+      .mockResolvedValueOnce(new Response('blocked', { status: 403 }));
 
     const result = await createCheckInventoryTool('worker-key').handler({
       keyword: '핫식스',
       storeKeyword: '안산',
     });
 
-    expect(JSON.parse(result.content[0].text).stockAvailable).toBe(true);
-    expect(mockFetch).toHaveBeenNthCalledWith(
-      5,
-      'https://api.zyte.com/v1/extract',
-      expect.objectContaining({
-        headers: expect.objectContaining({
-          Authorization: `Basic ${Buffer.from('worker-key:').toString('base64')}`,
-        }),
-      }),
-    );
+    expect(JSON.parse(result.content[0].text).stockAvailable).toBe(false);
+    expect(mockFetch).toHaveBeenCalledTimes(4);
+    expect(mockFetch.mock.calls.some(([url]) => String(url).includes('api.zyte.com'))).toBe(false);
   });
 });

@@ -1,110 +1,93 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { requestByZyte } from '../../src/utils/zyte.js';
+import { decodeBase64, decodeZyteHttpBody, requestByZyte } from '../../src/utils/zyte.js';
 
 const mockFetch = vi.fn();
+const policyMessage = 'Zyte 유료 호출은 비용 정책에 따라 비활성화되어 있습니다.';
 
 beforeEach(() => {
   mockFetch.mockReset();
+  mockFetch.mockResolvedValue(new Response(JSON.stringify({ statusCode: 200 })));
   vi.stubGlobal('fetch', mockFetch);
 });
 
 afterEach(() => {
-  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
 });
 
-describe('requestByZyte', () => {
-  it('통계 구분용 태그를 Zyte 요청 본문에 포함한다', async () => {
-    mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify({ statusCode: 200, httpResponseBody: 'e30=' })),
+describe('requestByZyte 비용 정책', () => {
+  it('명시적인 키가 있어도 유료 요청을 보내지 않는다', async () => {
+    await expect(requestByZyte({ apiKey: 'test-key', url: 'https://example.com' })).rejects.toThrow(
+      policyMessage,
     );
-
-    await requestByZyte({
-      apiKey: 'test-key',
-      url: 'https://example.com/api',
-      tags: { service: 'cgv', operation: 'timetable' },
-    });
-
-    const requestInit = mockFetch.mock.calls[0][1] as RequestInit;
-    expect(JSON.parse(String(requestInit.body))).toMatchObject({
-      tags: { service: 'cgv', operation: 'timetable' },
-    });
+    expect(mockFetch).not.toHaveBeenCalled();
   });
 
-  it('AbortError가 발생하면 한 번 재시도한다', async () => {
-    mockFetch
-      .mockRejectedValueOnce(new DOMException('aborted', 'AbortError'))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ statusCode: 200, httpResponseBody: 'e30=' })));
-
-    const result = await requestByZyte({
-      apiKey: 'test-key',
-      url: 'https://example.com/api',
-      timeout: 1000,
-      retryDelayMs: 0,
-    });
-
-    expect(result.statusCode).toBe(200);
-    expect(mockFetch).toHaveBeenCalledTimes(2);
+  it('환경 변수에 키가 남아 있어도 유료 요청을 보내지 않는다', async () => {
+    vi.stubEnv('ZYTE_API_KEY', 'test-env-key');
+    await expect(requestByZyte({ url: 'https://example.com' })).rejects.toThrow(policyMessage);
+    expect(mockFetch).not.toHaveBeenCalled();
   });
 
-  it('Zyte API 5xx가 발생하면 한 번 재시도한다', async () => {
-    mockFetch
-      .mockResolvedValueOnce(new Response(JSON.stringify({ detail: 'temporary outage' }), { status: 503 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ statusCode: 200, httpResponseBody: 'e30=' })));
-
-    const result = await requestByZyte({
-      apiKey: 'test-key',
-      url: 'https://example.com/api',
-      timeout: 1000,
-      retryDelayMs: 0,
-    });
-
-    expect(result.statusCode).toBe(200);
-    expect(mockFetch).toHaveBeenCalledTimes(2);
+  it('키가 없어도 설정 안내 대신 비용 정책을 알린다', async () => {
+    vi.stubEnv('ZYTE_API_KEY', undefined);
+    await expect(requestByZyte({ url: 'https://example.com' })).rejects.toThrow(policyMessage);
+    expect(mockFetch).not.toHaveBeenCalled();
   });
 
-  it('Zyte API가 평문 520 오류를 반환해도 상태와 본문을 보존한다', async () => {
-    mockFetch.mockResolvedValueOnce(new Response('error code: 520', { status: 520 }));
-
+  it('키를 조회하기 전에 요청을 차단한다', async () => {
+    const readKey = vi.fn(() => {
+      throw new Error('키에 접근했습니다');
+    });
     await expect(
       requestByZyte({
-        apiKey: 'test-key',
-        url: 'https://example.com/api',
-        retries: 0,
+        url: 'https://example.com',
+        get apiKey() {
+          return readKey();
+        },
       }),
-    ).rejects.toThrow('Zyte API 호출 실패: 520 error code: 520');
-
-    expect(mockFetch).toHaveBeenCalledTimes(1);
+    ).rejects.toThrow(policyMessage);
+    expect(readKey).not.toHaveBeenCalled();
+    expect(mockFetch).not.toHaveBeenCalled();
   });
 
-  it('대상 사이트 5xx 응답이면 한 번 재시도한다', async () => {
-    mockFetch
-      .mockResolvedValueOnce(new Response(JSON.stringify({ statusCode: 520, httpResponseBody: 'e30=' })))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ statusCode: 200, httpResponseBody: 'e30=' })));
+  it('동시 요청과 재시도 설정도 유료 요청을 만들지 않는다', async () => {
+    const results = await Promise.allSettled(
+      Array.from({ length: 20 }, () =>
+        requestByZyte({
+          apiKey: 'test-key',
+          url: 'https://example.com',
+          retries: 100,
+          retryDelayMs: 0,
+        }),
+      ),
+    );
+    for (const result of results) {
+      expect(result).toMatchObject({ status: 'rejected', reason: new Error(policyMessage) });
+    }
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+});
 
-    const result = await requestByZyte({
-      apiKey: 'test-key',
-      url: 'https://example.com/api',
-      timeout: 1000,
-      retryDelayMs: 0,
-    });
-
-    expect(result.statusCode).toBe(200);
-    expect(mockFetch).toHaveBeenCalledTimes(2);
+describe('기존 응답 디코딩 호환성', () => {
+  it('UTF-8 본문을 디코딩한다', () => {
+    const encoded = Buffer.from(JSON.stringify({ name: '커피' })).toString('base64');
+    expect(decodeBase64(encoded)).toBe('{"name":"커피"}');
+    expect(decodeZyteHttpBody({ httpResponseBody: encoded })).toEqual({ name: '커피' });
   });
 
-  it('네트워크 오류가 발생하면 한 번 재시도한다', async () => {
-    mockFetch
-      .mockRejectedValueOnce(new TypeError('fetch failed'))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ statusCode: 200, httpResponseBody: 'e30=' })));
+  it('본문 누락은 명확한 오류를 반환한다', () => {
+    expect(() => decodeZyteHttpBody({})).toThrow('Zyte HTTP 응답 본문이 비어 있습니다.');
+  });
 
-    const result = await requestByZyte({
-      apiKey: 'test-key',
-      url: 'https://example.com/api',
-      timeout: 1000,
-      retryDelayMs: 0,
-    });
+  it('atob가 없으면 Buffer를 사용한다', () => {
+    vi.stubGlobal('atob', undefined);
+    expect(decodeBase64('e30=')).toBe('{}');
+  });
 
-    expect(result.statusCode).toBe(200);
-    expect(mockFetch).toHaveBeenCalledTimes(2);
+  it('디코딩 수단이 없으면 오류를 반환한다', () => {
+    vi.stubGlobal('atob', undefined);
+    vi.stubGlobal('Buffer', undefined);
+    expect(() => decodeBase64('e30=')).toThrow('Base64 디코딩을 지원하지 않는 런타임입니다.');
   });
 });

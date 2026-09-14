@@ -1,3 +1,4 @@
+import { clearSevenElevenReadCache } from '../../../src/services/seveneleven/readCache.js';
 /**
  * 세븐일레븐 서비스 테스트
  */
@@ -8,6 +9,7 @@ import { createSevenElevenService } from '../../../src/services/seveneleven/inde
 const mockFetch = vi.fn();
 
 beforeEach(() => {
+  clearSevenElevenReadCache();
   mockFetch.mockReset();
   vi.stubGlobal('fetch', mockFetch);
 });
@@ -45,48 +47,17 @@ describe('createSevenElevenService', () => {
     ]);
   });
 
-  it('서비스 옵션의 Zyte 키를 MCP 도구에 전달한다', async () => {
-    const payload = {
-      success: true,
-      data: {
-        SearchQueryResult: {
-          query: '커피',
-          Collection: [
-            {
-              CollectionId: 'offline',
-              Documentset: {
-                totalCount: 1,
-                Document: [{ prdNo: '1', itemCd: '8801', itemOnm: '아메리카노' }],
-              },
-            },
-          ],
-        },
-      },
-    };
-    mockFetch
-      .mockResolvedValueOnce(new Response('blocked', { status: 403 }))
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            statusCode: 200,
-            httpResponseBody: Buffer.from(JSON.stringify(payload)).toString('base64'),
-          }),
-        ),
-      );
-
-    const service = createSevenElevenService({ zyteApiKey: 'worker-key' });
-    const tool = service.getTools().find((item) => item.name === 'seveneleven_search_products');
+  it('서비스에 키가 있어도 MCP 상품 조회는 유료 호출 없이 차단된다', async () => {
+    mockFetch.mockResolvedValueOnce(new Response('blocked', { status: 403 }));
+    const tool = createSevenElevenService({ zyteApiKey: 'worker-key' })
+      .getTools()
+      .find((item) => item.name === 'seveneleven_search_products');
     const result = await tool?.handler({ query: '커피', size: 1 });
-
-    expect(result?.structuredContent).toMatchObject({ count: 1 });
-    expect(mockFetch).toHaveBeenNthCalledWith(
-      2,
-      'https://api.zyte.com/v1/extract',
-      expect.objectContaining({
-        headers: expect.objectContaining({
-          Authorization: `Basic ${Buffer.from('worker-key:').toString('base64')}`,
-        }),
-      }),
-    );
+    expect(result?.structuredContent).toMatchObject({
+      count: 0,
+      status: 'degraded',
+      message: expect.stringContaining('비용 정책'),
+    });
+    expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 });

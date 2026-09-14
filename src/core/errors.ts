@@ -2,6 +2,8 @@
  * MCP/API 공통 에러 진단 구조
  */
 
+export const ZYTE_COST_POLICY_MESSAGE = 'Zyte 유료 호출은 비용 정책에 따라 비활성화되어 있습니다.';
+
 export interface StandardErrorDiagnostics {
   code: string;
   message: string;
@@ -82,6 +84,7 @@ export function toStandardErrorDiagnostics(
   } = {},
 ): StandardErrorDiagnostics {
   const inferred = inferServiceAndOperation(code);
+  const costPolicyError = message.includes(ZYTE_COST_POLICY_MESSAGE);
   // 실제 Zyte 진단 문구만 설정 오류로 취급해 일반적인 접근 차단과 구분합니다.
   const configurationError = [
     'Zyte API 호출 실패: 403 Your account has been suspended.',
@@ -89,9 +92,15 @@ export function toStandardErrorDiagnostics(
     'ZYTE_API_KEY가 설정되지 않았습니다.',
   ].some((diagnostic) => message.includes(diagnostic));
   const gs25AuthenticationError =
-    code === 'GS25_UPSTREAM_UNAVAILABLE' &&
     message.includes('GS25 재고 서비스 인증을 사용할 수 없습니다.');
+  const oliveyoungRelayConfigurationError = [
+    '올리브영 릴레이 URL은 HTTPS 또는 로컬 HTTP 주소여야 합니다.',
+    'OY_RELAY_TOKEN이 필요합니다.',
+    '올리브영 직접 요청 실패. 운영자는 OY_RELAY_URL과 OY_RELAY_TOKEN으로 브라우저 릴레이를 설정해주세요.',
+  ].includes(message);
   const retryable =
+    !oliveyoungRelayConfigurationError &&
+    !costPolicyError &&
     !configurationError &&
     !gs25AuthenticationError &&
     isRetryable(code, options.status || options.upstreamStatus);
@@ -104,11 +113,15 @@ export function toStandardErrorDiagnostics(
     service: options.service || inferred.service,
     operation: options.operation || inferred.operation,
     upstreamStatus: options.upstreamStatus,
-    hint: gs25AuthenticationError
-      ? '운영자는 GS25_API_KEY 설정을 확인하세요.'
-      : configurationError
-        ? '운영자는 ZYTE_API_KEY 설정과 Zyte 계정 상태를 확인하세요.'
-        : buildHint(retryable),
+    hint: oliveyoungRelayConfigurationError
+      ? '운영자는 OY_RELAY_URL과 OY_RELAY_TOKEN 및 브라우저 릴레이 실행 상태를 확인하세요.'
+      : costPolicyError
+      ? ZYTE_COST_POLICY_MESSAGE
+      : gs25AuthenticationError
+        ? '운영자는 GS25_API_KEY 설정을 확인하세요.'
+        : configurationError
+          ? '운영자는 ZYTE_API_KEY 설정과 Zyte 계정 상태를 확인하세요.'
+          : buildHint(retryable),
   };
 }
 

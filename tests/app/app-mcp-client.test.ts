@@ -5,6 +5,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import app from '../../src/index.js';
+import type { AppBindings } from '../../src/api/response.js';
 import { createMockProductResponse } from '../api/testHelpers.js';
 
 const mockFetch = vi.fn();
@@ -33,12 +34,12 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-async function createLocalMcpClient(): Promise<Client> {
+async function createLocalMcpClient(bindings?: AppBindings): Promise<Client> {
   const client = new Client({ name: 'vitest-mcp-client', version: '1.0.0' });
   const transport = new StreamableHTTPClientTransport(new URL('https://local.test/mcp'), {
     fetch: async (url, init) => {
       const request = new Request(url, init);
-      return app.request(request);
+      return app.request(request, undefined, bindings);
     },
   });
 
@@ -130,4 +131,16 @@ describe('MCP client smoke', () => {
       await client.close();
     }
   });
+});
+
+it('MCP도 키가 남아 있어도 유료 호출 없이 정책 오류를 전달한다', async () => {
+  mockFetch.mockResolvedValue(new Response('blocked', { status: 403 }));
+  const client = await createLocalMcpClient({ ZYTE_API_KEY: 'remaining-key' });
+  try {
+    const result = await client.callTool({ name: 'cgv_find_theaters', arguments: { limit: 1 } });
+    expect(result.isError).toBe(true);
+    expect(JSON.stringify(result.content)).toContain('비용 정책');
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(mockFetch.mock.calls.every(([url]) => !String(url).includes('api.zyte.com'))).toBe(true);
+  } finally { await client.close(); }
 });

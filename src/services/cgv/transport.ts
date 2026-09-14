@@ -1,11 +1,10 @@
 /**
  * CGV 전송 계층
  *
- * 서명 헤더 생성, 직접 호출, Zyte fallback을 담당합니다.
+ * 서명 헤더를 생성하고 직접 호출합니다. 유료 대체 경로는 사용하지 않습니다.
  */
 
 import { createTimeoutController } from '../../utils/http.js';
-import { decodeZyteHttpBody, requestByZyte } from '../../utils/zyte.js';
 import { CGV_API } from './api.js';
 import { CgvUpstreamUnavailableError } from './errors.js';
 
@@ -56,39 +55,11 @@ async function parseJsonResponse<TResponse>(response: Response): Promise<TRespon
   }
 }
 
-async function requestByZyteCgv<TResponse>(
-  path: string,
-  searchParams: URLSearchParams,
-  timeout: number,
-  apiKey: string,
-): Promise<TResponse> {
-  const url = `${CGV_API.BASE_URL}${path}?${searchParams.toString()}`;
-  const timestamp = Math.floor(Date.now() / 1000).toString();
-  const signature = await createSignature(path, '', timestamp);
-  const result = await requestByZyte({
-    apiKey,
-    timeout,
-    url,
-    headers: [
-      { name: 'Accept', value: 'application/json' },
-      { name: 'Accept-Language', value: 'ko-KR' },
-      { name: 'X-TIMESTAMP', value: timestamp },
-      { name: 'X-SIGNATURE', value: signature },
-    ],
-    tags: { service: 'cgv' },
-  });
-
-  if (result.statusCode === 401 || result.statusCode === 403) {
-    throw new CgvUpstreamUnavailableError();
-  }
-  return decodeZyteHttpBody<TResponse>(result);
-}
-
 export async function requestCgv<TResponse>(
   path: string,
   searchParams: URLSearchParams,
   timeout = 15000,
-  zyteApiKey?: string,
+  _zyteApiKey?: string,
 ): Promise<TResponse> {
   const url = `${CGV_API.BASE_URL}${path}?${searchParams.toString()}`;
   const timestamp = Math.floor(Date.now() / 1000).toString();
@@ -112,19 +83,7 @@ export async function requestCgv<TResponse>(
     }
 
     if (response.status === 401 || response.status === 403) {
-      const normalizedZyteApiKey = zyteApiKey?.trim();
-      if (!normalizedZyteApiKey) {
-        throw new CgvUpstreamUnavailableError();
-      }
-
-      try {
-        return await requestByZyteCgv<TResponse>(path, searchParams, timeout, normalizedZyteApiKey);
-      } catch (fallbackError) {
-        if (fallbackError instanceof CgvUpstreamUnavailableError) {
-          throw fallbackError;
-        }
-        throw new CgvUpstreamUnavailableError();
-      }
+      throw new CgvUpstreamUnavailableError();
     }
 
     throw new Error(`CGV API 호출 실패: ${response.status}`);

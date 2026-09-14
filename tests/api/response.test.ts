@@ -105,3 +105,30 @@ describe('GS25 인증 장애 안내', () => {
     expect(diagnostics.hint).toContain('GS25_API_KEY');
   });
 });
+
+describe('Zyte 비용 정책 진단', () => {
+  it('서비스 오류로 감싸져도 재시도나 키 설정을 권하지 않는다', () => {
+    const diagnostics = toStandardErrorDiagnostics(
+      'OLIVEYOUNG_STORE_SEARCH_FAILED',
+      '조회 실패: Zyte 유료 호출은 비용 정책에 따라 비활성화되어 있습니다.',
+      { status: 503 },
+    );
+    expect(diagnostics.retryable).toBe(false);
+    expect(diagnostics.hint).toContain('비용 정책');
+    expect(diagnostics.hint).not.toContain('ZYTE_API_KEY');
+  });
+});
+
+describe('올리브영 무료 중계 설정 안내', () => {
+  it.each([
+    '올리브영 릴레이 URL은 HTTPS 또는 로컬 HTTP 주소여야 합니다.',
+    'OY_RELAY_TOKEN이 필요합니다.',
+    '올리브영 직접 요청 실패. 운영자는 OY_RELAY_URL과 OY_RELAY_TOKEN으로 브라우저 릴레이를 설정해주세요.',
+  ])('설정이 필요한 오류는 재시도를 권하지 않는다: %s', (message) => {
+    expect(toStandardErrorDiagnostics('OLIVEYOUNG_PRODUCT_SEARCH_FAILED', message, { status: 500 }))
+      .toMatchObject({ retryable: false, hint: '운영자는 OY_RELAY_URL과 OY_RELAY_TOKEN 및 브라우저 릴레이 실행 상태를 확인하세요.' });
+  });
+  it.each(['올리브영 브라우저 릴레이 요청 실패', '올리브영 API 요청 시간 초과'])('일시적인 실행 오류의 재시도는 유지한다: %s', (message) => {
+    expect(toStandardErrorDiagnostics('OLIVEYOUNG_PRODUCT_SEARCH_FAILED', message, { status: 500 }).retryable).toBe(true);
+  });
+});

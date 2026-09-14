@@ -1,3 +1,4 @@
+import type { OliveyoungRequestOptions } from '../transport.js';
 /**
  * 올리브영 상품 검색 도구
  */
@@ -16,7 +17,7 @@ interface SearchProductsArgs {
   zyteApiKey?: string;
 }
 
-async function searchProducts(args: SearchProductsArgs): Promise<McpToolResponse> {
+async function searchProducts(args: SearchProductsArgs, transport: OliveyoungRequestOptions): Promise<McpToolResponse> {
   const {
     keyword,
     page = 1,
@@ -42,6 +43,7 @@ async function searchProducts(args: SearchProductsArgs): Promise<McpToolResponse
     {
       timeout: timeoutMs,
       apiKey: zyteApiKey,
+      ...transport,
     },
   );
 
@@ -69,7 +71,7 @@ async function searchProducts(args: SearchProductsArgs): Promise<McpToolResponse
   };
 }
 
-export function createSearchProductsTool(apiKey?: string): ToolRegistration {
+export function createSearchProductsTool(apiKey?: string, transport: OliveyoungRequestOptions = {}): ToolRegistration {
   return {
     name: 'oliveyoung_search_products',
     metadata: {
@@ -86,6 +88,6 @@ export function createSearchProductsTool(apiKey?: string): ToolRegistration {
       },
     },
     handler: ((args: SearchProductsArgs) =>
-      searchProducts({ ...args, zyteApiKey: apiKey })) as (args: unknown) => Promise<McpToolResponse>,
+      searchProducts({ ...args, zyteApiKey: apiKey }, transport)) as (args: unknown) => Promise<McpToolResponse>,
   };
 }

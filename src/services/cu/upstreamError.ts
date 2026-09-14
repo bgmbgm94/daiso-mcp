@@ -8,9 +8,5 @@ export function cuStockUnavailableReason(error: unknown): string | null {
   if (error instanceof HttpError && [400, 403, 429].includes(error.status)) {
     return `CU 재고 API가 차단되었습니다 (${error.status} Request Blocked).`;
   }
-  const message = error instanceof Error ? error.message : '';
-  if (message.includes('Zyte API 호출 실패: 520') || message.includes('Zyte 대상 응답 실패: 520')) {
-    return 'CU 재고 API가 차단되었습니다 (Zyte Website Ban 520).';
-  }
   return null;
 }

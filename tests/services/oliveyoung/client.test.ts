@@ -24,15 +24,8 @@ afterEach(() => {
   delete process.env.ZYTE_API_KEY;
 });
 
-function createZyteResponse(body: unknown, status = 200) {
-  const encoded = Buffer.from(JSON.stringify(body), 'utf8').toString('base64');
-  return new Response(
-    JSON.stringify({
-      statusCode: status,
-      httpResponseBody: encoded,
-    }),
-    { status }
-  );
+function createDirectResponse(body: unknown, status = 200) {
+  return Response.json(body, { status });
 }
 
 function createDeferred<T>() {
@@ -49,7 +42,7 @@ function createDeferred<T>() {
 describe('fetchOliveyoungStores', () => {
   it('매장 목록을 반환한다', async () => {
     mockFetch.mockResolvedValue(
-      createZyteResponse({
+      createDirectResponse({
         status: 'SUCCESS',
         data: {
           totalCount: 1,
@@ -77,27 +70,22 @@ describe('fetchOliveyoungStores', () => {
     expect(result.stores[0].pickupYn).toBe(true);
   });
 
-  it('환경 변수 API 키를 사용한다', async () => {
+  it('환경 변수의 유료 키를 무시하고 직접 호출한다', async () => {
     process.env.ZYTE_API_KEY = 'env-key';
-    mockFetch.mockResolvedValue(createZyteResponse({ status: 'SUCCESS', data: { totalCount: 0, storeList: [] } }));
+    mockFetch.mockResolvedValue(createDirectResponse({ status: 'SUCCESS', data: { totalCount: 0, storeList: [] } }));
 
     await fetchOliveyoungStores({ latitude: 37.5, longitude: 127.0, pageIdx: 1, searchWords: '' });
 
     expect(mockFetch).toHaveBeenCalledWith(
-      'https://api.zyte.com/v1/extract',
+      'https://www.oliveyoung.co.kr/oystore/api/storeFinder/find-store',
       expect.objectContaining({
         headers: expect.objectContaining({
-          Authorization: expect.stringMatching(/^Basic /),
+          'Content-Type': 'application/json',
         }),
       })
     );
   });
 
-  it('API 키가 없으면 에러를 던진다', async () => {
-    await expect(
-      fetchOliveyoungStores({ latitude: 37.5, longitude: 127.0, pageIdx: 1, searchWords: '' })
-    ).rejects.toThrow('ZYTE_API_KEY가 설정되지 않았습니다. .env 또는 Cloudflare Worker Secret을 확인해주세요.');
-  });
 
   it('Zyte HTTP 에러를 처리한다', async () => {
     mockFetch.mockResolvedValue(
@@ -109,7 +97,7 @@ describe('fetchOliveyoungStores', () => {
         { latitude: 37.5, longitude: 127.0, pageIdx: 1, searchWords: '' },
         { apiKey: 'test-key' }
       )
-    ).rejects.toThrow('Zyte API 호출 실패: 400 bad request');
+    ).rejects.toThrow('올리브영 직접 요청 실패');
   });
 
   it('Zyte HTTP 에러에서 title 필드를 사용한다', async () => {
@@ -122,7 +110,7 @@ describe('fetchOliveyoungStores', () => {
         { latitude: 37.5, longitude: 127.0, pageIdx: 1, searchWords: '' },
         { apiKey: 'test-key' }
       )
-    ).rejects.toThrow('Zyte API 호출 실패: 401 bad title');
+    ).rejects.toThrow('올리브영 직접 요청 실패');
   });
 
   it('Zyte HTTP 에러에서 detail/title이 없으면 상태코드만 사용한다', async () => {
@@ -133,11 +121,11 @@ describe('fetchOliveyoungStores', () => {
         { latitude: 37.5, longitude: 127.0, pageIdx: 1, searchWords: '' },
         { apiKey: 'test-key' }
       )
-    ).rejects.toThrow('Zyte API 호출 실패: 403');
+    ).rejects.toThrow('올리브영 직접 요청 실패');
   });
 
   it('storeList가 없어도 기본값을 반환한다', async () => {
-    mockFetch.mockResolvedValue(createZyteResponse({ status: 'SUCCESS', data: {} }));
+    mockFetch.mockResolvedValue(createDirectResponse({ status: 'SUCCESS', data: {} }));
 
     const result = await fetchOliveyoungStores(
       { latitude: 37.5, longitude: 127.0, pageIdx: 1, searchWords: '' },
@@ -150,7 +138,7 @@ describe('fetchOliveyoungStores', () => {
 
   it('매장 필드가 비어있으면 기본값을 사용한다', async () => {
     mockFetch.mockResolvedValue(
-      createZyteResponse({
+      createDirectResponse({
         status: 'SUCCESS',
         data: {
           totalCount: 1,
@@ -171,7 +159,7 @@ describe('fetchOliveyoungStores', () => {
   it('매장 검색 실패 시 같은 조건의 직전 성공 결과를 반환한다', async () => {
     mockFetch
       .mockResolvedValueOnce(
-        createZyteResponse({
+        createDirectResponse({
           status: 'SUCCESS',
           data: {
             totalCount: 1,
@@ -187,12 +175,12 @@ describe('fetchOliveyoungStores', () => {
     const fallback = await fetchOliveyoungStores(params, { apiKey: 'test-key' });
 
     expect(fallback).toEqual(first);
-    expect(mockFetch).toHaveBeenCalledTimes(3);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
   });
 
   it('올리브영 API 상태 오류를 처리한다', async () => {
     mockFetch.mockResolvedValue(
-      createZyteResponse({ status: 'FAIL', data: {} })
+      createDirectResponse({ status: 'FAIL', data: {} })
     );
 
     await expect(
@@ -234,7 +222,7 @@ describe('fetchOliveyoungStores', () => {
   it('btoa가 없으면 Buffer 인코딩 경로를 사용한다', async () => {
     const originalBtoa = globalThis.btoa;
     vi.stubGlobal('btoa', undefined);
-    mockFetch.mockResolvedValue(createZyteResponse({ status: 'SUCCESS', data: { totalCount: 0, storeList: [] } }));
+    mockFetch.mockResolvedValue(createDirectResponse({ status: 'SUCCESS', data: { totalCount: 0, storeList: [] } }));
 
     await fetchOliveyoungStores(
       { latitude: 37.5, longitude: 127.0, pageIdx: 1, searchWords: '' },
@@ -244,28 +232,12 @@ describe('fetchOliveyoungStores', () => {
     globalThis.btoa = originalBtoa;
   });
 
-  it('인코딩 수단이 없으면 에러를 던진다', async () => {
-    const originalBtoa = globalThis.btoa;
-    const originalBuffer = globalThis.Buffer;
-    vi.stubGlobal('btoa', undefined);
-    vi.stubGlobal('Buffer', undefined);
-
-    await expect(
-      fetchOliveyoungStores(
-        { latitude: 37.5, longitude: 127.0, pageIdx: 1, searchWords: '' },
-        { apiKey: 'test-key' }
-      )
-    ).rejects.toThrow('Basic 인증 인코딩을 지원하지 않는 런타임입니다.');
-
-    globalThis.btoa = originalBtoa;
-    globalThis.Buffer = originalBuffer;
-  });
 });
 
 describe('fetchOliveyoungProducts', () => {
   it('상품 목록을 반환한다', async () => {
     mockFetch.mockResolvedValue(
-      createZyteResponse({
+      createDirectResponse({
         status: 'SUCCESS',
         data: {
           totalCount: 1,
@@ -303,7 +275,7 @@ describe('fetchOliveyoungProducts', () => {
 
   it('절대 이미지 URL은 그대로 유지한다', async () => {
     mockFetch.mockResolvedValue(
-      createZyteResponse({
+      createDirectResponse({
         status: 'SUCCESS',
         data: {
           totalCount: 1,
@@ -331,7 +303,7 @@ describe('fetchOliveyoungProducts', () => {
 
   it('프로토콜 상대 이미지 URL은 https로 보정한다', async () => {
     mockFetch.mockResolvedValue(
-      createZyteResponse({
+      createDirectResponse({
         status: 'SUCCESS',
         data: {
           totalCount: 1,
@@ -359,7 +331,7 @@ describe('fetchOliveyoungProducts', () => {
 
   it('슬래시 없는 상대 이미지 경로는 절대 URL로 보정한다', async () => {
     mockFetch.mockResolvedValue(
-      createZyteResponse({
+      createDirectResponse({
         status: 'SUCCESS',
         data: {
           totalCount: 1,
@@ -387,7 +359,7 @@ describe('fetchOliveyoungProducts', () => {
 
   it('o2oRemainQuantity가 0이어도 o2oStockFlag가 true면 재고 있음으로 본다', async () => {
     mockFetch.mockResolvedValue(
-      createZyteResponse({
+      createDirectResponse({
         status: 'SUCCESS',
         data: {
           totalCount: 1,
@@ -415,7 +387,7 @@ describe('fetchOliveyoungProducts', () => {
 
   it('searchList 대체 필드를 처리한다', async () => {
     mockFetch.mockResolvedValue(
-      createZyteResponse({
+      createDirectResponse({
         status: 'SUCCESS',
         data: {
           totalCount: 1,
@@ -436,7 +408,7 @@ describe('fetchOliveyoungProducts', () => {
 
   it('상품 필드가 비어있으면 기본값을 사용한다', async () => {
     mockFetch.mockResolvedValue(
-      createZyteResponse({
+      createDirectResponse({
         status: 'SUCCESS',
         data: {
           totalCount: 1,
@@ -458,7 +430,7 @@ describe('fetchOliveyoungProducts', () => {
 
   it('검색 리스트가 없으면 빈 배열을 반환한다', async () => {
     mockFetch.mockResolvedValue(
-      createZyteResponse({
+      createDirectResponse({
         status: 'SUCCESS',
         data: { totalCount: 0, nextPage: false },
       })
@@ -475,7 +447,7 @@ describe('fetchOliveyoungProducts', () => {
   it('상품 검색 실패 시 같은 조건의 직전 성공 결과를 반환한다', async () => {
     mockFetch
       .mockResolvedValueOnce(
-        createZyteResponse({
+        createDirectResponse({
           status: 'SUCCESS',
           data: {
             totalCount: 1,
@@ -493,7 +465,7 @@ describe('fetchOliveyoungProducts', () => {
 
     expect(first.products[0].goodsName).toBe('립밤');
     expect(fallback).toEqual(first);
-    expect(mockFetch).toHaveBeenCalledTimes(3);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
   });
 
   it('상품 검색 실패 시 만료된 직전 결과는 사용하지 않는다', async () => {
@@ -501,7 +473,7 @@ describe('fetchOliveyoungProducts', () => {
     vi.spyOn(Date, 'now').mockImplementation(() => now);
     mockFetch
       .mockResolvedValueOnce(
-        createZyteResponse({
+        createDirectResponse({
           status: 'SUCCESS',
           data: {
             totalCount: 1,
@@ -530,7 +502,7 @@ describe('fetchOliveyoungProducts', () => {
         { keyword: '선크림', page: 1, size: 20, sort: '01', includeSoldOut: false },
         { apiKey: 'test-key' }
       )
-    ).rejects.toThrow('올리브영 API 응답 실패: 200');
+    ).rejects.toThrow('올리브영 API 상태 오류: UNKNOWN');
   });
 
   it('statusCode가 없으면 unknown 오류를 반환한다', async () => {
@@ -543,7 +515,7 @@ describe('fetchOliveyoungProducts', () => {
         { keyword: '선크림', page: 1, size: 20, sort: '01', includeSoldOut: false },
         { apiKey: 'test-key' }
       )
-    ).rejects.toThrow('올리브영 API 응답 실패: unknown');
+    ).rejects.toThrow('올리브영 API 상태 오류: UNKNOWN');
   });
 
   it('status 필드가 없으면 UNKNOWN 오류를 반환한다', async () => {
@@ -569,7 +541,7 @@ describe('fetchOliveyoungProducts', () => {
     const originalAtob = globalThis.atob;
     vi.stubGlobal('atob', undefined);
     mockFetch.mockResolvedValue(
-      createZyteResponse({
+      createDirectResponse({
         status: 'SUCCESS',
         data: { totalCount: 0, nextPage: false, serachList: [] },
       })
@@ -584,59 +556,25 @@ describe('fetchOliveyoungProducts', () => {
     globalThis.atob = originalAtob;
   });
 
-  it('디코딩 수단이 없으면 에러를 던진다', async () => {
-    const encodedBody = Buffer.from(
-      JSON.stringify({
-        status: 'SUCCESS',
-        data: { totalCount: 0, nextPage: false, serachList: [] },
-      }),
-      'utf8'
-    ).toString('base64');
-
-    const originalAtob = globalThis.atob;
-    const originalBuffer = globalThis.Buffer;
-    vi.stubGlobal('atob', undefined);
-    vi.stubGlobal('Buffer', undefined);
-
-    mockFetch.mockResolvedValue({
-      ok: true,
-      status: 200,
-      text: async () =>
-        JSON.stringify({
-          statusCode: 200,
-          httpResponseBody: encodedBody,
-        }),
-    });
-
-    await expect(
-      fetchOliveyoungProducts(
-        { keyword: '테스트', page: 1, size: 20, sort: '01', includeSoldOut: false },
-        { apiKey: 'test-key' }
-      )
-    ).rejects.toThrow('Base64 디코딩을 지원하지 않는 런타임입니다.');
-
-    globalThis.atob = originalAtob;
-    globalThis.Buffer = originalBuffer;
-  });
 });
 
 describe('enrichOliveyoungProductsWithNearbyStoreInventory', () => {
   it('상품별 주변 매장 수량 정보를 붙이고 재고 있는 상품을 앞으로 정렬한다', async () => {
     mockFetch
       .mockResolvedValueOnce(
-        createZyteResponse({
+        createDirectResponse({
           status: 'SUCCESS',
           data: { goodsInfo: { masterGoodsNumber: '8801' } },
         })
       )
       .mockResolvedValueOnce(
-        createZyteResponse({
+        createDirectResponse({
           status: 'SUCCESS',
           data: { goodsInfo: { masterGoodsNumber: '8802' } },
         })
       )
       .mockResolvedValueOnce(
-        createZyteResponse({
+        createDirectResponse({
           status: 'SUCCESS',
           data: {
             totalCount: 2,
@@ -648,7 +586,7 @@ describe('enrichOliveyoungProductsWithNearbyStoreInventory', () => {
         })
       )
       .mockResolvedValueOnce(
-        createZyteResponse({
+        createDirectResponse({
           status: 'SUCCESS',
           data: {
             totalCount: 1,
@@ -707,9 +645,8 @@ describe('enrichOliveyoungProductsWithNearbyStoreInventory', () => {
     const firstGoodsInfo = createDeferred<Response>();
     const requestedPaths: string[] = [];
 
-    mockFetch.mockImplementation((_: string, init?: RequestInit) => {
-      const payload = JSON.parse(String(init?.body || '{}')) as { url?: string };
-      const path = payload.url ? new URL(payload.url).pathname : '';
+    mockFetch.mockImplementation((url: string) => {
+      const path = new URL(url).pathname;
       requestedPaths.push(path);
 
       if (path.endsWith('/stock-goods-info-v3')) {
@@ -720,7 +657,7 @@ describe('enrichOliveyoungProductsWithNearbyStoreInventory', () => {
         }
 
         return Promise.resolve(
-          createZyteResponse({
+          createDirectResponse({
             status: 'SUCCESS',
             data: { goodsInfo: { masterGoodsNumber: '8802' } },
           })
@@ -728,7 +665,7 @@ describe('enrichOliveyoungProductsWithNearbyStoreInventory', () => {
       }
 
       return Promise.resolve(
-        createZyteResponse({
+        createDirectResponse({
           status: 'SUCCESS',
           data: { totalCount: 0, storeList: [] },
         })
@@ -776,7 +713,7 @@ describe('enrichOliveyoungProductsWithNearbyStoreInventory', () => {
     expect(requestedPaths.filter((item) => item.endsWith('/stock-goods-info-v3'))).toHaveLength(2);
 
     firstGoodsInfo.resolve(
-      createZyteResponse({
+      createDirectResponse({
         status: 'SUCCESS',
         data: { goodsInfo: { masterGoodsNumber: '8801' } },
       })
@@ -835,13 +772,13 @@ describe('enrichOliveyoungProductsWithNearbyStoreInventory', () => {
 
     mockFetch
       .mockResolvedValueOnce(
-        createZyteResponse({
+        createDirectResponse({
           status: 'SUCCESS',
           data: { goodsInfo: { masterGoodsNumber: '8801' } },
         })
       )
       .mockResolvedValue(
-        createZyteResponse({
+        createDirectResponse({
           status: 'SUCCESS',
           data: {
             totalCount: 1,
@@ -871,17 +808,14 @@ describe('enrichOliveyoungProductsWithNearbyStoreInventory', () => {
       { apiKey: 'test-key' }
     );
 
-    const requestedPaths = mockFetch.mock.calls.map(([, init]) => {
-      const payload = JSON.parse(String(init?.body || '{}')) as { url?: string };
-      return payload.url ? new URL(payload.url).pathname : '';
-    });
+    const requestedPaths = mockFetch.mock.calls.map(([url]) => new URL(url).pathname);
     expect(requestedPaths.filter((path) => path.endsWith('/stock-goods-info-v3'))).toHaveLength(1);
     expect(requestedPaths.filter((path) => path.endsWith('/stock-stores'))).toHaveLength(2);
   });
 
   it('goods info에 masterGoodsNumber가 없으면 상품을 그대로 유지한다', async () => {
     mockFetch.mockResolvedValueOnce(
-      createZyteResponse({
+      createDirectResponse({
         status: 'SUCCESS',
         data: { goodsInfo: {} },
       })
@@ -1011,13 +945,13 @@ describe('enrichOliveyoungProductsWithNearbyStoreInventory', () => {
     ];
     mockFetch
       .mockResolvedValueOnce(
-        createZyteResponse({
+        createDirectResponse({
           status: 'SUCCESS',
           data: { goodsInfo: { masterGoodsNumber: '8801' } },
         })
       )
       .mockResolvedValueOnce(
-        createZyteResponse({
+        createDirectResponse({
           status: 'SUCCESS',
           data: {
             totalCount: 1,
@@ -1052,26 +986,26 @@ describe('enrichOliveyoungProductsWithNearbyStoreInventory', () => {
     expect(first.checkedCount).toBe(1);
     expect(fallback.checkedCount).toBe(1);
     expect(fallback.products[0]).toEqual(first.products[0]);
-    expect(mockFetch).toHaveBeenCalledTimes(4);
+    expect(mockFetch).toHaveBeenCalledTimes(3);
   });
 
   it('상품별 매장 재고 보강 실패는 해당 상품만 원본 상태로 유지하고 나머지 상품 조회를 계속한다', async () => {
     mockFetch
       .mockResolvedValueOnce(
-        createZyteResponse({
+        createDirectResponse({
           status: 'SUCCESS',
           data: { goodsInfo: { masterGoodsNumber: '8801' } },
         })
       )
       .mockResolvedValueOnce(
-        createZyteResponse({
+        createDirectResponse({
           status: 'SUCCESS',
           data: { goodsInfo: { masterGoodsNumber: '8802' } },
         })
       )
       .mockRejectedValueOnce(new Error('stock timeout'))
       .mockResolvedValueOnce(
-        createZyteResponse({
+        createDirectResponse({
           status: 'SUCCESS',
           data: {
             totalCount: 1,
@@ -1136,13 +1070,13 @@ describe('enrichOliveyoungProductsWithNearbyStoreInventory', () => {
   it('stock-stores 응답에 빈 데이터가 오면 주변 매장 재고를 품절로 처리한다', async () => {
     mockFetch
       .mockResolvedValueOnce(
-        createZyteResponse({
+        createDirectResponse({
           status: 'SUCCESS',
           data: { goodsInfo: { masterGoodsNumber: '8803' } },
         })
       )
       .mockResolvedValueOnce(
-        createZyteResponse({
+        createDirectResponse({
           status: 'SUCCESS',
           data: {},
         })
@@ -1188,13 +1122,13 @@ describe('enrichOliveyoungProductsWithNearbyStoreInventory', () => {
   it('stock-stores 항목이 비어 있어도 기본값과 재고 라벨을 계산한다', async () => {
     mockFetch
       .mockResolvedValueOnce(
-        createZyteResponse({
+        createDirectResponse({
           status: 'SUCCESS',
           data: { goodsInfo: { masterGoodsNumber: '8804' } },
         })
       )
       .mockResolvedValueOnce(
-        createZyteResponse({
+        createDirectResponse({
           status: 'SUCCESS',
           data: {
             totalCount: 1,

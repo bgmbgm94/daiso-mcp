@@ -46,7 +46,7 @@ describe('handleCgvFindTheaters', () => {
         success: false,
         error: {
           code: 'CGV_UPSTREAM_UNAVAILABLE',
-          message: 'CGV 원본 서비스에 연결할 수 없습니다. 잠시 후 다시 시도해주세요.',
+          message: expect.stringContaining('비용 정책'),
         },
       }),
       503,

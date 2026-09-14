@@ -38,27 +38,42 @@ function createMockContext(query: Record<string, string> = {}) {
 
 describe('handleGs25FindStores', () => {
   it('재고 API 인증 실패 시 키워드 공개 검색으로 복구한다', async () => {
-    mockFetch.mockResolvedValueOnce(new Response('{}', { status: 401 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify([
-        { shopCode: 'VY010', shopName: 'GS25강남', posX: 127.02, posY: 37.49 },
-      ])));
+    mockFetch
+      .mockResolvedValueOnce(new Response('{}', { status: 401 }))
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify([{ shopCode: 'VY010', shopName: 'GS25강남', posX: 127.02, posY: 37.49 }]),
+        ),
+      );
     const ctx = createMockContext({ keyword: '강남' });
     await handleGs25FindStores(ctx);
-    expect(ctx.json).toHaveBeenCalledWith(expect.objectContaining({
-      success: true, data: expect.objectContaining({ fallbackUsed: true,
-        stores: [expect.objectContaining({ storeCode: 'VY010' })] }),
-    }));
+    expect(ctx.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        success: true,
+        data: expect.objectContaining({
+          fallbackUsed: true,
+          stores: [expect.objectContaining({ storeCode: 'VY010' })],
+        }),
+      }),
+    );
     expect(mockFetch).toHaveBeenCalledTimes(2);
   });
 
   it.each([401, 200])('원본 %s 이후 공개 매장 검색 실패를 숨기지 않는다', async (status) => {
-    mockFetch.mockResolvedValueOnce(new Response('{"stores":[]}', { status }))
-      .mockImplementation(() => Promise.resolve(new Response('public unavailable', { status: 503 })));
+    mockFetch
+      .mockResolvedValueOnce(new Response('{"stores":[]}', { status }))
+      .mockImplementation(() =>
+        Promise.resolve(new Response('public unavailable', { status: 503 })),
+      );
     const ctx = createMockContext({ keyword: '강남' });
     await handleGs25FindStores(ctx);
-    expect(ctx.json).toHaveBeenCalledWith(expect.objectContaining({
-      success: false, error: expect.objectContaining({ message: expect.stringContaining('503') }),
-    }), 500);
+    expect(ctx.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        success: false,
+        error: expect.objectContaining({ message: expect.stringContaining('503') }),
+      }),
+      500,
+    );
   });
 
   it('매장 검색 결과를 반환한다', async () => {
@@ -84,9 +99,13 @@ describe('handleGs25FindStores', () => {
   it('store/stock 매장 조회가 0건이면 GS25 웹 매장 검색으로 fallback한다', async () => {
     mockFetch
       .mockResolvedValueOnce(new Response(JSON.stringify({ stores: [] })))
-      .mockResolvedValueOnce(new Response(JSON.stringify([
-        { shopCode: 'VY010', shopName: 'GS25강남', address: '서울', posY: 37.49, posX: 127.02 },
-      ])));
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify([
+            { shopCode: 'VY010', shopName: 'GS25강남', address: '서울', posY: 37.49, posX: 127.02 },
+          ]),
+        ),
+      );
 
     const ctx = createMockContext({ keyword: '강남', limit: '1' });
     await handleGs25FindStores(ctx);
@@ -209,44 +228,22 @@ describe('handleGs25SearchProducts', () => {
     );
   });
 
-  it('상품 검색에서 Worker 403이 발생하면 env Zyte 키로 fallback한다', async () => {
-    const zyteBody = Buffer.from(
-      JSON.stringify({
-        SearchQueryResult: {
-          Collection: [
-            {
-              Documentset: {
-                Document: [{ field: { itemCode: '123', itemName: '오감자', stockCheckYn: 'Y' } }],
-              },
-            },
-          ],
-        },
-      }),
-      'utf8',
-    ).toString('base64');
-
-    mockFetch
-      .mockResolvedValueOnce(new Response('forbidden', { status: 403, statusText: 'Forbidden' }))
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify({ statusCode: 200, httpResponseBody: zyteBody })),
-      );
-
+  it('handleGs25SearchProducts는 차단 시 유료 호출 없이 비용 정책 오류를 반환한다', async () => {
+    mockFetch.mockResolvedValueOnce(new Response('blocked', { status: 403 }));
     const ctx = createMockContext({ keyword: '오감자' });
-    (ctx as { env: Record<string, string> }).env = { ZYTE_API_KEY: 'test-zyte-key' };
+    (ctx as { env: Record<string, string> }).env = { ZYTE_API_KEY: 'test-key' };
     await handleGs25SearchProducts(ctx);
-
     expect(ctx.json).toHaveBeenCalledWith(
       expect.objectContaining({
-        success: true,
-        data: expect.objectContaining({
-          count: 1,
-          products: [expect.objectContaining({ itemCode: '123' })],
+        success: false,
+        diagnostics: expect.objectContaining({
+          retryable: false,
+          hint: expect.stringContaining('비용 정책'),
         }),
       }),
+      500,
     );
-    expect(String((mockFetch.mock.calls[1][1] as RequestInit).body)).toContain(
-      '"url":"https://b2c-apigw.woodongs.com/search/v3/totalSearch"',
-    );
+    expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 
   it('상품 검색 중 예외 발생 시 에러를 반환한다', async () => {
@@ -294,7 +291,8 @@ describe('handleGs25CheckInventory', () => {
         success: false,
         error: {
           code: 'GS25_UPSTREAM_UNAVAILABLE',
-          message: 'GS25 재고 서비스 인증을 사용할 수 없습니다. 운영자는 GS25_API_KEY 설정을 확인하세요.',
+          message:
+            'GS25 재고 서비스 인증을 사용할 수 없습니다. 운영자는 GS25_API_KEY 설정을 확인하세요.',
         },
       }),
       503,
@@ -434,51 +432,22 @@ describe('handleGs25CheckInventory', () => {
     );
   });
 
-  it('keyword 기반 재고 조회도 상품 검색 403을 env Zyte 키로 fallback한다', async () => {
-    const zyteBody = Buffer.from(
-      JSON.stringify({
-        SearchQueryResult: {
-          Collection: [
-            { Documentset: { Document: [{ field: { itemCode: '123', itemName: '오감자' } }] } },
-          ],
-        },
-      }),
-      'utf8',
-    ).toString('base64');
-
-    mockFetch
-      .mockResolvedValueOnce(new Response('forbidden', { status: 403, statusText: 'Forbidden' }))
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify({ statusCode: 200, httpResponseBody: zyteBody })),
-      )
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            stores: [
-              {
-                storeCode: '1',
-                storeName: '강남역점',
-                searchItemName: '오감자',
-                realStockQuantity: 1,
-              },
-            ],
-          }),
-        ),
-      );
-
+  it('handleGs25CheckInventory는 차단 시 유료 호출 없이 비용 정책 오류를 반환한다', async () => {
+    mockFetch.mockResolvedValueOnce(new Response('blocked', { status: 403 }));
     const ctx = createMockContext({ keyword: '오감자' });
-    (ctx as { env: Record<string, string> }).env = { ZYTE_API_KEY: 'test-zyte-key' };
+    (ctx as { env: Record<string, string> }).env = { ZYTE_API_KEY: 'test-key' };
     await handleGs25CheckInventory(ctx);
-
     expect(ctx.json).toHaveBeenCalledWith(
       expect.objectContaining({
-        success: true,
-        data: expect.objectContaining({
-          itemCode: '123',
-          inventory: expect.objectContaining({ inStockStoreCount: 1 }),
+        success: false,
+        diagnostics: expect.objectContaining({
+          retryable: false,
+          hint: expect.stringContaining('비용 정책'),
         }),
       }),
+      500,
     );
+    expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 
   it('storeKeyword를 먼저 직접 지오코딩해 재고 조회 좌표로 사용한다', async () => {

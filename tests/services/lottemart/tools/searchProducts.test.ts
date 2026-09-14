@@ -8,18 +8,7 @@ import { createSearchProductsTool } from '../../../../src/services/lottemart/too
 
 const mockFetch = vi.fn();
 const createSessionResponse = () => new Response('', { headers: { 'set-cookie': 'ASPSESSIONID=TEST; path=/' } });
-const createZyteResponse = (bodyText: string) =>
-  new Response(
-    JSON.stringify({
-      statusCode: 200,
-      httpResponseBody: Buffer.from(bodyText, 'utf8').toString('base64'),
-    }),
-    {
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    },
-  );
+
 
 beforeEach(() => {
   mockFetch.mockReset();
@@ -82,29 +71,13 @@ describe('createSearchProductsTool', () => {
     expect(parsed.products[0].productName).toBe('코카콜라');
   });
 
-  it('기본 Zyte 키로 직접 매장 옵션 조회 실패를 우회한다', async () => {
-    mockFetch
-      .mockResolvedValueOnce(new Response('origin timeout', { status: 522, statusText: 'Origin Timeout' }))
-      .mockResolvedValueOnce(createZyteResponse('<option value="2301">강변점</option>'))
-      .mockResolvedValueOnce(
-        new Response(`
-          <!doctype html>
-          <div class="total-num">검색결과 : <span>0</span>건</div>
-          <script>var totalPage = "1";</script>
-          <ul class="list-result"></ul>
-        `),
-      );
-
-    const tool = createSearchProductsTool('test-zyte-key');
-    const result = await tool.handler({
-      area: '서울',
-      storeCode: '2301',
-      keyword: '콜라',
-    });
-
-    const parsed = JSON.parse(result.content[0].text);
-    expect(parsed.storeCode).toBe('2301');
-    expect(String(mockFetch.mock.calls[1]?.[0])).toBe('https://api.zyte.com/v1/extract');
+  it('매장 옵션 조회가 실패해도 무료 제타 상품 경로는 유지한다', async () => {
+    mockFetch.mockResolvedValueOnce(new Response('origin timeout',{status:522,statusText:'Origin Timeout'}))
+      .mockResolvedValueOnce(new Response(JSON.stringify({productGroups:[]})));
+    const result=await createSearchProductsTool('worker-key').handler({area:'서울',storeCode:'2301',keyword:'콜라'});
+    expect(JSON.parse(result.content[0].text).storeCode).toBe('2301');
+    expect(String(mockFetch.mock.calls[1][0])).toContain('https://lottemartzetta.com/');
+    expect(mockFetch.mock.calls.every(([url])=>!String(url).includes('api.zyte.com'))).toBe(true);
   });
 
   it('source 옵션을 제타 상품 API 경로로 전달한다', async () => {

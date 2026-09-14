@@ -45,62 +45,13 @@ describe('fetchGs25Stores', () => {
     expect(mockFetch).toHaveBeenCalledTimes(2);
   });
 
-  it('store/stock 403이면 Zyte fallback으로 매장을 조회한다', async () => {
-    const zyteBody = Buffer.from(
-      JSON.stringify({
-        stores: [{ storeCode: 'VE463', storeName: '강남역점' }],
-      }),
-      'utf8',
-    ).toString('base64');
-
-    mockFetch
-      .mockResolvedValueOnce(new Response('forbidden', { status: 403, statusText: 'Forbidden' }))
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            statusCode: 200,
-            httpResponseBody: zyteBody,
-          }),
-        ),
-      );
-
-    const result = await fetchGs25Stores({ useCache: false }, { zyteApiKey: 'test-zyte-key' });
-
-    expect(result.stores[0].storeCode).toBe('VE463');
-    expect(mockFetch).toHaveBeenNthCalledWith(
-      2,
-      'https://api.zyte.com/v1/extract',
-      expect.any(Object),
+  it('매장 조회 차단 시 유료 호출 없이 서비스 이용 불가를 알린다', async () => {
+    mockFetch.mockResolvedValueOnce(new Response('blocked', { status: 403 }));
+    await expect(fetchGs25Stores({ useCache: false }, { zyteApiKey: 'test-key' })).rejects.toThrow(
+      'GS25',
     );
-  });
-
-  it('Zyte 대상이 인증을 거부하면 명시적인 upstream unavailable 오류를 던진다', async () => {
-    mockFetch
-      .mockResolvedValueOnce(new Response('forbidden', { status: 403, statusText: 'Forbidden' }))
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            statusCode: 403,
-            httpResponseBody: Buffer.from('forbidden').toString('base64'),
-          }),
-        ),
-      );
-
-    await expect(
-      fetchGs25Stores({ useCache: false }, { zyteApiKey: 'test-zyte-key' }),
-    ).rejects.toBeInstanceOf(Gs25UpstreamUnavailableError);
-  });
-
-  it('Zyte 호출 자체가 실패해도 명시적인 upstream unavailable 오류를 던진다', async () => {
-    mockFetch
-      .mockResolvedValueOnce(new Response('forbidden', { status: 403, statusText: 'Forbidden' }))
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify({ detail: 'account suspended' }), { status: 403 }),
-      );
-
-    await expect(
-      fetchGs25Stores({ useCache: false }, { zyteApiKey: 'test-zyte-key' }),
-    ).rejects.toBeInstanceOf(Gs25UpstreamUnavailableError);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(mockFetch.mock.calls.some(([url]) => String(url).includes('api.zyte.com'))).toBe(false);
   });
 
   it('store/stock 403이어도 Zyte 키가 없으면 원본 에러를 반환한다', async () => {
@@ -305,52 +256,13 @@ describe('fetchGs25SearchProducts', () => {
     expect(mockFetch).toHaveBeenCalledTimes(2);
   });
 
-  it('상품 검색 403이면 Zyte fallback으로 검색한다', async () => {
-    const zyteBody = Buffer.from(
-      JSON.stringify({
-        SearchQueryResult: {
-          Collection: [
-            {
-              Documentset: {
-                Document: [{ field: { itemCode: '8801', itemName: '콜라', stockCheckYn: 'Y' } }],
-              },
-            },
-          ],
-        },
-      }),
-      'utf8',
-    ).toString('base64');
-
-    mockFetch
-      .mockResolvedValueOnce(new Response('forbidden', { status: 403, statusText: 'Forbidden' }))
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            statusCode: 200,
-            httpResponseBody: zyteBody,
-          }),
-        ),
-      );
-
-    const result = await fetchGs25SearchProducts('콜라', { zyteApiKey: 'test-zyte-key' });
-
-    expect(result[0]).toEqual(
-      expect.objectContaining({
-        itemCode: '8801',
-        itemName: '콜라',
-        stockCheckEnabled: true,
-      }),
+  it('상품 검색 차단 시 유료 호출 없이 비용 정책을 알린다', async () => {
+    mockFetch.mockResolvedValueOnce(new Response('blocked', { status: 403 }));
+    await expect(fetchGs25SearchProducts('콜라', { zyteApiKey: 'test-key' })).rejects.toThrow(
+      '비용 정책',
     );
-    expect(mockFetch).toHaveBeenNthCalledWith(
-      2,
-      'https://api.zyte.com/v1/extract',
-      expect.objectContaining({
-        body: expect.stringContaining('"httpRequestMethod":"POST"'),
-      }),
-    );
-    expect(String((mockFetch.mock.calls[1][1] as RequestInit).body)).toContain(
-      '"httpRequestText":"{\\"query\\":\\"콜라\\"}"',
-    );
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(mockFetch.mock.calls.some(([url]) => String(url).includes('api.zyte.com'))).toBe(false);
   });
 
   it('상품 검색 403이어도 Zyte 키가 없으면 원본 에러를 반환한다', async () => {

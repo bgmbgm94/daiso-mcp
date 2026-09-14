@@ -22,7 +22,7 @@ describe('GET /api/oliveyoung/stores', () => {
       'utf8',
     ).toString('base64');
 
-    mockFetch.mockResolvedValue(new Response(JSON.stringify({ statusCode: 200, httpResponseBody: encoded })));
+    mockFetch.mockResolvedValue(new Response(Buffer.from(encoded, 'base64').toString('utf8')));
 
     const res = await app.request('/api/oliveyoung/stores?keyword=명동', undefined, {
       ZYTE_API_KEY: 'test-key',
@@ -57,7 +57,7 @@ describe('GET /api/oliveyoung/products', () => {
     ).toString('base64');
 
     mockFetch.mockResolvedValue(
-      new Response(JSON.stringify({ statusCode: 200, httpResponseBody: productEncoded })),
+      new Response(Buffer.from(productEncoded, 'base64').toString('utf8')),
     );
 
     const res = await app.request('/api/oliveyoung/products?keyword=마스크팩', undefined, {
@@ -121,10 +121,10 @@ describe('GET /api/oliveyoung/inventory', () => {
     ).toString('base64');
 
     mockFetch
-      .mockResolvedValueOnce(new Response(JSON.stringify({ statusCode: 200, httpResponseBody: storeEncoded })))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ statusCode: 200, httpResponseBody: productEncoded })))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ statusCode: 200, httpResponseBody: goodsInfoEncoded })))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ statusCode: 200, httpResponseBody: stockStoresEncoded })));
+      .mockResolvedValueOnce(new Response(Buffer.from(storeEncoded, 'base64').toString('utf8')))
+      .mockResolvedValueOnce(new Response(Buffer.from(productEncoded, 'base64').toString('utf8')))
+      .mockResolvedValueOnce(new Response(Buffer.from(goodsInfoEncoded, 'base64').toString('utf8')))
+      .mockResolvedValueOnce(new Response(Buffer.from(stockStoresEncoded, 'base64').toString('utf8')));
 
     const res = await app.request('/api/oliveyoung/inventory?keyword=선크림', undefined, {
       ZYTE_API_KEY: 'test-key',
@@ -151,4 +151,15 @@ describe('GET /api/oliveyoung/inventory', () => {
     expect(data.success).toBe(false);
     expect(data.error.code).toBe('MISSING_QUERY');
   });
+});
+
+it('Worker 바인딩의 릴레이 설정을 REST 상품 검색에 전달한다', async () => {
+  mockFetch.mockResolvedValue(Response.json({ status: 'SUCCESS', data: { totalCount: 0 } }));
+  const response = await app.request('/api/oliveyoung/products?keyword=relay-binding-proof', undefined, {
+    OY_RELAY_URL: 'https://relay.example', OY_RELAY_TOKEN: 'trusted-token',
+  });
+  expect(response.status).toBe(200);
+  expect(mockFetch).toHaveBeenCalledWith('https://relay.example/v1/oliveyoung/product-search-v3', expect.objectContaining({
+    headers: expect.objectContaining({ Authorization: 'Bearer trusted-token' }),
+  }));
 });

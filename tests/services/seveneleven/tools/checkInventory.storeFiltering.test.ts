@@ -1,3 +1,4 @@
+import { clearSevenElevenReadCache } from '../../../../src/services/seveneleven/readCache.js';
 /**
  * 세븐일레븐 재고 확인 도구 매장 필터링 테스트
  */
@@ -8,6 +9,7 @@ import { createCheckInventoryTool } from '../../../../src/services/seveneleven/t
 const mockFetch = vi.fn();
 
 beforeEach(() => {
+  clearSevenElevenReadCache();
   mockFetch.mockReset();
   vi.stubGlobal('fetch', mockFetch);
 });

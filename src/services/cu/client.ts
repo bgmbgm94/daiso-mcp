@@ -3,7 +3,7 @@
  */
 
 import { fetchJson } from '../../utils/http.js';
-import { decodeBase64, requestByZyte } from '../../utils/zyte.js';
+import { ZYTE_COST_POLICY_MESSAGE } from '../../core/errors.js';
 import { fetchJsonWithZyteFallback } from '../../utils/zyteJsonFallback.js';
 import { CU_API } from './api.js';
 import { cuStockUnavailableReason } from './upstreamError.js';
@@ -127,7 +127,7 @@ async function requestCuJson<T>(
 async function requestCuWebHtml(
   path: string,
   body: Record<string, string>,
-  apiKey?: string,
+  _apiKey?: string,
   timeout = 15000,
 ): Promise<string> {
   const form = new URLSearchParams(body);
@@ -145,23 +145,7 @@ async function requestCuWebHtml(
   }
 
   if (response.status === 400 || response.status === 403 || response.status === 429) {
-    try {
-      const result = await requestByZyte({
-        apiKey,
-        url: targetUrl,
-        timeout,
-        method: 'POST',
-        headers: Object.entries(CU_WEB_DEFAULT_HEADERS).map(([name, value]) => ({ name, value })),
-        bodyText: formText,
-        tags: { service: 'cu' },
-      });
-
-      if (result.statusCode === 200 && result.httpResponseBody) {
-        return decodeBase64(result.httpResponseBody);
-      }
-    } catch {
-      // 직접 호출 실패 시 Zyte 재시도도 실패하면 원본 에러를 반환합니다.
-    }
+    throw new Error(ZYTE_COST_POLICY_MESSAGE);
   }
 
   throw new Error(`API 요청 실패: ${response.status} ${response.statusText}`);

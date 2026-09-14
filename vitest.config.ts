@@ -30,7 +30,7 @@ export default defineConfig({
       reporter: ['text', 'text-summary', 'html', 'json'],
 
       // 커버리지 대상 파일
-      include: ['src/**/*.ts'],
+      include: ['src/**/*.ts', 'scripts/relay/oliveyoung.ts', 'scripts/relay/browser.ts'],
 
       // 커버리지 제외 파일
       exclude: [

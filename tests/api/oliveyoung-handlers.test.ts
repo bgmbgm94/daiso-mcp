@@ -8,6 +8,7 @@ import {
   handleOliveyoungFindStores,
   handleOliveyoungCheckInventory,
 } from '../../src/api/handlers.js';
+import * as oliveyoungClient from '../../src/services/oliveyoung/client.js';
 import { __testOnlyClearOliveyoungCaches } from '../../src/services/oliveyoung/client.js';
 
 const mockFetch = vi.fn();
@@ -38,20 +39,14 @@ function createMockContext(query: Record<string, string> = {}) {
   } as unknown as Parameters<typeof handleOliveyoungFindStores>[0];
 }
 
-function createMockZyteResponse(body: unknown) {
-  const encoded = Buffer.from(JSON.stringify(body), 'utf8').toString('base64');
-  return new Response(
-    JSON.stringify({
-      statusCode: 200,
-      httpResponseBody: encoded,
-    })
-  );
+function createMockDirectResponse(body: unknown) {
+  return Response.json(body);
 }
 
 describe('handleOliveyoungFindStores', () => {
   it('올리브영 매장 검색 결과를 반환한다', async () => {
     mockFetch.mockResolvedValue(
-      createMockZyteResponse({
+      createMockDirectResponse({
         status: 'SUCCESS',
         data: {
           totalCount: 1,
@@ -84,7 +79,7 @@ describe('handleOliveyoungFindStores', () => {
   it('timeoutMs 쿼리를 올리브영 매장 검색 요청에 전달한다', async () => {
     const timeoutSpy = vi.spyOn(globalThis, 'setTimeout');
     mockFetch.mockResolvedValue(
-      createMockZyteResponse({
+      createMockDirectResponse({
         status: 'SUCCESS',
         data: { totalCount: 0, storeList: [] },
       })
@@ -99,7 +94,7 @@ describe('handleOliveyoungFindStores', () => {
   it('매장 검색 timeoutMs 쿼리가 유효하지 않으면 기본 제한 시간을 사용한다', async () => {
     const timeoutSpy = vi.spyOn(globalThis, 'setTimeout');
     mockFetch.mockResolvedValue(
-      createMockZyteResponse({
+      createMockDirectResponse({
         status: 'SUCCESS',
         data: { totalCount: 0, storeList: [] },
       })
@@ -120,7 +115,7 @@ describe('handleOliveyoungFindStores', () => {
     expect(ctx.json).toHaveBeenCalledWith(
       expect.objectContaining({
         success: false,
-        error: { code: 'OLIVEYOUNG_STORE_SEARCH_FAILED', message: 'zyte fail' },
+        error: { code: 'OLIVEYOUNG_STORE_SEARCH_FAILED', message: expect.stringContaining('올리브영 직접 요청 실패') },
       }),
       500
     );
@@ -128,7 +123,7 @@ describe('handleOliveyoungFindStores', () => {
 
   it('keyword 없이도 기본 검색을 수행한다', async () => {
     mockFetch.mockResolvedValue(
-      createMockZyteResponse({
+      createMockDirectResponse({
         status: 'SUCCESS',
         data: { totalCount: 0, storeList: [] },
       })
@@ -153,7 +148,7 @@ describe('handleOliveyoungFindStores', () => {
     expect(ctx.json).toHaveBeenCalledWith(
       expect.objectContaining({
         success: false,
-        error: { code: 'OLIVEYOUNG_STORE_SEARCH_FAILED', message: '알 수 없는 오류가 발생했습니다.' },
+        error: { code: 'OLIVEYOUNG_STORE_SEARCH_FAILED', message: expect.stringContaining('올리브영 직접 요청 실패') },
       }),
       500
     );
@@ -163,7 +158,7 @@ describe('handleOliveyoungFindStores', () => {
 describe('handleOliveyoungSearchProducts', () => {
   it('올리브영 상품 검색 결과를 반환한다', async () => {
     mockFetch.mockResolvedValue(
-      createMockZyteResponse({
+      createMockDirectResponse({
         status: 'SUCCESS',
         data: {
           totalCount: 1,
@@ -207,7 +202,7 @@ describe('handleOliveyoungSearchProducts', () => {
   it('timeoutMs 쿼리를 올리브영 상품 검색 요청에 전달한다', async () => {
     const timeoutSpy = vi.spyOn(globalThis, 'setTimeout');
     mockFetch.mockResolvedValue(
-      createMockZyteResponse({
+      createMockDirectResponse({
         status: 'SUCCESS',
         data: { totalCount: 0, nextPage: false, serachList: [] },
       })
@@ -222,7 +217,7 @@ describe('handleOliveyoungSearchProducts', () => {
   it('상품 검색 timeoutMs 쿼리가 0 이하이면 기본 제한 시간을 사용한다', async () => {
     const timeoutSpy = vi.spyOn(globalThis, 'setTimeout');
     mockFetch.mockResolvedValue(
-      createMockZyteResponse({
+      createMockDirectResponse({
         status: 'SUCCESS',
         data: { totalCount: 0, nextPage: false, serachList: [] },
       })
@@ -256,7 +251,7 @@ describe('handleOliveyoungSearchProducts', () => {
     expect(ctx.json).toHaveBeenCalledWith(
       expect.objectContaining({
         success: false,
-        error: { code: 'OLIVEYOUNG_PRODUCT_SEARCH_FAILED', message: 'search fail' },
+        error: { code: 'OLIVEYOUNG_PRODUCT_SEARCH_FAILED', message: expect.stringContaining('올리브영 직접 요청 실패') },
       }),
       500
     );
@@ -271,7 +266,7 @@ describe('handleOliveyoungSearchProducts', () => {
     expect(ctx.json).toHaveBeenCalledWith(
       expect.objectContaining({
         success: false,
-        error: { code: 'OLIVEYOUNG_PRODUCT_SEARCH_FAILED', message: '알 수 없는 오류가 발생했습니다.' },
+        error: { code: 'OLIVEYOUNG_PRODUCT_SEARCH_FAILED', message: expect.stringContaining('올리브영 직접 요청 실패') },
       }),
       500
     );
@@ -282,7 +277,7 @@ describe('handleOliveyoungCheckInventory', () => {
   it('올리브영 재고 정보를 반환한다', async () => {
     mockFetch
       .mockResolvedValueOnce(
-        createMockZyteResponse({
+        createMockDirectResponse({
           status: 'SUCCESS',
           data: {
             totalCount: 1,
@@ -299,7 +294,7 @@ describe('handleOliveyoungCheckInventory', () => {
         })
       )
       .mockResolvedValueOnce(
-        createMockZyteResponse({
+        createMockDirectResponse({
           status: 'SUCCESS',
           data: {
             totalCount: 1,
@@ -319,13 +314,13 @@ describe('handleOliveyoungCheckInventory', () => {
         })
       )
       .mockResolvedValueOnce(
-        createMockZyteResponse({
+        createMockDirectResponse({
           status: 'SUCCESS',
           data: { goodsInfo: { masterGoodsNumber: '8801' } },
         })
       )
       .mockResolvedValueOnce(
-        createMockZyteResponse({
+        createMockDirectResponse({
           status: 'SUCCESS',
           data: {
             totalCount: 1,
@@ -372,13 +367,13 @@ describe('handleOliveyoungCheckInventory', () => {
     const timeoutSpy = vi.spyOn(globalThis, 'setTimeout');
     mockFetch
       .mockResolvedValueOnce(
-        createMockZyteResponse({
+        createMockDirectResponse({
           status: 'SUCCESS',
           data: { totalCount: 1, storeList: [{ storeCode: 'D176', storeName: '올리브영 명동 타운' }] },
         })
       )
       .mockResolvedValueOnce(
-        createMockZyteResponse({
+        createMockDirectResponse({
           status: 'SUCCESS',
           data: {
             totalCount: 1,
@@ -388,13 +383,13 @@ describe('handleOliveyoungCheckInventory', () => {
         })
       )
       .mockResolvedValueOnce(
-        createMockZyteResponse({
+        createMockDirectResponse({
           status: 'SUCCESS',
           data: { goodsInfo: { masterGoodsNumber: '8801' } },
         })
       )
       .mockResolvedValueOnce(
-        createMockZyteResponse({
+        createMockDirectResponse({
           status: 'SUCCESS',
           data: { totalCount: 1, storeList: [{ storeCode: 'D176', salesStoreYn: true, remainQuantity: 2 }] },
         })
@@ -419,13 +414,13 @@ describe('handleOliveyoungCheckInventory', () => {
   it('stockCheckLimit 쿼리로 주변 매장 재고 보강 상품 수를 제한한다', async () => {
     mockFetch
       .mockResolvedValueOnce(
-        createMockZyteResponse({
+        createMockDirectResponse({
           status: 'SUCCESS',
           data: { totalCount: 1, storeList: [{ storeCode: 'D176', storeName: '올리브영 명동 타운' }] },
         })
       )
       .mockResolvedValueOnce(
-        createMockZyteResponse({
+        createMockDirectResponse({
           status: 'SUCCESS',
           data: {
             totalCount: 2,
@@ -438,13 +433,13 @@ describe('handleOliveyoungCheckInventory', () => {
         })
       )
       .mockResolvedValueOnce(
-        createMockZyteResponse({
+        createMockDirectResponse({
           status: 'SUCCESS',
           data: { goodsInfo: { masterGoodsNumber: '8801' } },
         })
       )
       .mockResolvedValueOnce(
-        createMockZyteResponse({
+        createMockDirectResponse({
           status: 'SUCCESS',
           data: { totalCount: 1, storeList: [{ storeCode: 'D176', salesStoreYn: true, remainQuantity: 2 }] },
         })
@@ -470,13 +465,13 @@ describe('handleOliveyoungCheckInventory', () => {
   it('stockCheckLimit 쿼리가 유효하지 않으면 기본 보강 상품 수를 사용한다', async () => {
     mockFetch
       .mockResolvedValueOnce(
-        createMockZyteResponse({
+        createMockDirectResponse({
           status: 'SUCCESS',
           data: { totalCount: 1, storeList: [{ storeCode: 'D176', storeName: '올리브영 명동 타운' }] },
         })
       )
       .mockResolvedValueOnce(
-        createMockZyteResponse({
+        createMockDirectResponse({
           status: 'SUCCESS',
           data: {
             totalCount: 2,
@@ -489,25 +484,25 @@ describe('handleOliveyoungCheckInventory', () => {
         })
       )
       .mockResolvedValueOnce(
-        createMockZyteResponse({
+        createMockDirectResponse({
           status: 'SUCCESS',
           data: { goodsInfo: { masterGoodsNumber: '8801' } },
         })
       )
       .mockResolvedValueOnce(
-        createMockZyteResponse({
+        createMockDirectResponse({
           status: 'SUCCESS',
           data: { goodsInfo: { masterGoodsNumber: '8802' } },
         })
       )
       .mockResolvedValueOnce(
-        createMockZyteResponse({
+        createMockDirectResponse({
           status: 'SUCCESS',
           data: { totalCount: 1, storeList: [{ storeCode: 'D176', salesStoreYn: true, remainQuantity: 2 }] },
         })
       )
       .mockResolvedValueOnce(
-        createMockZyteResponse({
+        createMockDirectResponse({
           status: 'SUCCESS',
           data: { totalCount: 1, storeList: [{ storeCode: 'D177', salesStoreYn: true, remainQuantity: 1 }] },
         })
@@ -552,7 +547,7 @@ describe('handleOliveyoungCheckInventory', () => {
     expect(ctx.json).toHaveBeenCalledWith(
       expect.objectContaining({
         success: false,
-        error: { code: 'OLIVEYOUNG_INVENTORY_CHECK_FAILED', message: 'inventory fail' },
+        error: { code: 'OLIVEYOUNG_INVENTORY_CHECK_FAILED', message: expect.stringContaining('올리브영 직접 요청 실패') },
       }),
       500
     );
@@ -567,9 +562,22 @@ describe('handleOliveyoungCheckInventory', () => {
     expect(ctx.json).toHaveBeenCalledWith(
       expect.objectContaining({
         success: false,
-        error: { code: 'OLIVEYOUNG_INVENTORY_CHECK_FAILED', message: '알 수 없는 오류가 발생했습니다.' },
+        error: { code: 'OLIVEYOUNG_INVENTORY_CHECK_FAILED', message: expect.stringContaining('올리브영 직접 요청 실패') },
       }),
       500
     );
   });
+});
+
+it.each([
+  ['fetchOliveyoungProducts', handleOliveyoungSearchProducts],
+  ['fetchOliveyoungStores', handleOliveyoungFindStores],
+  ['fetchOliveyoungProducts', handleOliveyoungCheckInventory],
+] as const)('도메인 함수가 비 Error 값을 던져도 핸들러가 안전하게 응답한다: %s', async (method, handler) => {
+  vi.spyOn(oliveyoungClient, method).mockRejectedValueOnce('unexpected');
+  const ctx = createMockContext({ keyword: '과자', latitude: '37.5', longitude: '127' });
+  await handler(ctx);
+  expect(ctx.json).toHaveBeenCalledWith(expect.objectContaining({
+    success: false, error: expect.objectContaining({ message: '알 수 없는 오류가 발생했습니다.' }),
+  }), 500);
 });

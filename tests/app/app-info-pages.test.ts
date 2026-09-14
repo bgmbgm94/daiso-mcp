@@ -296,7 +296,8 @@ describe('기본 페이지', () => {
       googleMapsApiKey: { configured: true, usedBy: expect.arrayContaining(['gs25', 'cgv']) },
       zyteApiKey: {
         configured: false,
-        usedBy: expect.arrayContaining(['oliveyoung', 'cgv', 'cu', 'seveneleven']),
+        enabled: false,
+        usedBy: [],
       },
       naverLocalSearch: { configured: false, usedBy: ['places'] },
       opinetApiKey: { configured: false, usedBy: ['opinet'] },

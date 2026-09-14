@@ -7,7 +7,7 @@ interface ConfigStatusItem {
 
 export interface ConfigStatus {
   googleMapsApiKey: ConfigStatusItem;
-  zyteApiKey: ConfigStatusItem;
+  zyteApiKey: ConfigStatusItem & { enabled: false };
   naverLocalSearch: ConfigStatusItem;
   opinetApiKey: ConfigStatusItem;
   supabaseFeedback: ConfigStatusItem;
@@ -26,7 +26,8 @@ export function buildConfigStatus(bindings?: AppBindings): ConfigStatus {
     },
     zyteApiKey: {
       configured: isConfigured(bindings?.ZYTE_API_KEY),
-      usedBy: ['oliveyoung', 'gs25', 'cu', 'seveneleven', 'lottemart', 'cgv'],
+      enabled: false,
+      usedBy: [],
     },
     naverLocalSearch: {
       configured:
