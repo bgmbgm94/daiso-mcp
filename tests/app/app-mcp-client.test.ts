@@ -141,6 +141,6 @@ it('MCP도 키가 남아 있어도 유료 호출 없이 정책 오류를 전달�
     expect(result.isError).toBe(true);
     expect(JSON.stringify(result.content)).toContain('비용 정책');
     expect(mockFetch).toHaveBeenCalledTimes(1);
-    expect(mockFetch.mock.calls.every(([url]) => !String(url).includes('api.zyte.com'))).toBe(true);
+    expect(mockFetch.mock.calls.every(([url]) => new URL(String(url)).hostname !== 'api.zyte.com')).toBe(true);
   } finally { await client.close(); }
 });

@@ -51,7 +51,7 @@ describe('fetchGs25Stores', () => {
       'GS25',
     );
     expect(mockFetch).toHaveBeenCalledTimes(1);
-    expect(mockFetch.mock.calls.some(([url]) => String(url).includes('api.zyte.com'))).toBe(false);
+    expect(mockFetch.mock.calls.some(([url]) => new URL(String(url)).hostname === 'api.zyte.com')).toBe(false);
   });
 
   it('store/stock 403이어도 Zyte 키가 없으면 원본 에러를 반환한다', async () => {
@@ -262,7 +262,7 @@ describe('fetchGs25SearchProducts', () => {
       '비용 정책',
     );
     expect(mockFetch).toHaveBeenCalledTimes(1);
-    expect(mockFetch.mock.calls.some(([url]) => String(url).includes('api.zyte.com'))).toBe(false);
+    expect(mockFetch.mock.calls.some(([url]) => new URL(String(url)).hostname === 'api.zyte.com')).toBe(false);
   });
 
   it('상품 검색 403이어도 Zyte 키가 없으면 원본 에러를 반환한다', async () => {

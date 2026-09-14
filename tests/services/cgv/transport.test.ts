@@ -62,7 +62,7 @@ describe('requestCgv', () => {
       ),
     ).rejects.toThrow('CGV');
     expect(mockFetch).toHaveBeenCalledTimes(1);
-    expect(mockFetch.mock.calls.some(([url]) => String(url).includes('api.zyte.com'))).toBe(false);
+    expect(mockFetch.mock.calls.some(([url]) => new URL(String(url)).hostname === 'api.zyte.com')).toBe(false);
   });
 
   it('직접 요청이 403이고 Zyte 키가 없으면 명시적인 upstream unavailable 오류를 던진다', async () => {

@@ -147,7 +147,7 @@ describe('searchSevenElevenProductsWithVariants', () => {
       searchSevenElevenProductsWithVariants('핫식스', { size: 1, zyteApiKey: 'worker-key' }),
     ).rejects.toThrow('비용 정책');
     expect(mockFetch).toHaveBeenCalledTimes(1);
-    expect(mockFetch.mock.calls.some(([url]) => String(url).includes('api.zyte.com'))).toBe(false);
+    expect(mockFetch.mock.calls.some(([url]) => new URL(String(url)).hostname === 'api.zyte.com')).toBe(false);
   });
 
   it('대체 질의 결과를 합쳐 가장 관련도 높은 상품을 앞에 둔다', async () => {

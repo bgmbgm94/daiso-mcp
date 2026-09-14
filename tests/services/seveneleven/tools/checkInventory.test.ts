@@ -512,6 +512,6 @@ describe('createCheckInventoryTool', () => {
 
     expect(JSON.parse(result.content[0].text).stockAvailable).toBe(false);
     expect(mockFetch).toHaveBeenCalledTimes(4);
-    expect(mockFetch.mock.calls.some(([url]) => String(url).includes('api.zyte.com'))).toBe(false);
+    expect(mockFetch.mock.calls.some(([url]) => new URL(String(url)).hostname === 'api.zyte.com')).toBe(false);
   });
 });

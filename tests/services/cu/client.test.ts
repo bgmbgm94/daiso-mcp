@@ -562,7 +562,7 @@ it('재고 원본 차단 후 Zyte 요청을 보내지 않는다', async () => {
   await expect(fetchCuStock({ keyword: '과자', limit: 1, offset: 0, searchSort: 'recom' }, { apiKey: 'remaining-key' }))
     .rejects.toThrow('비용 정책');
   expect(mockFetch).toHaveBeenCalledTimes(2);
-  expect(mockFetch.mock.calls.every(([url]) => !String(url).includes('api.zyte.com'))).toBe(true);
+  expect(mockFetch.mock.calls.every(([url]) => new URL(String(url)).hostname !== 'api.zyte.com')).toBe(true);
 });
 
 it.each([400, 403, 429])('키가 없는 재고 원본 %i 차단은 조회 불가로 표시한다', async (status) => {

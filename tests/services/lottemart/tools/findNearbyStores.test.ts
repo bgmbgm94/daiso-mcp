@@ -128,7 +128,7 @@ describe('createFindNearbyStoresTool', () => {
     mockFetch.mockResolvedValueOnce(new Response('origin timeout',{status:522,statusText:'Origin Timeout'}));
     const tool=createFindNearbyStoresTool(undefined,'worker-key');
     await expect(tool.handler({area:'서울',keyword:'잠실',limit:1,timeoutMs:1234})).rejects.toThrow('비용 정책');
-    expect(mockFetch.mock.calls.every(([url])=>!String(url).includes('api.zyte.com'))).toBe(true);
+    expect(mockFetch.mock.calls.every(([url])=>new URL(String(url)).hostname !== 'api.zyte.com')).toBe(true);
   });
 
   it('키워드가 있으면 롯데마트 upstream 매장 검색어 파라미터를 함께 보낸다', async () => {

@@ -628,7 +628,7 @@ it('키가 있어도 원본 실패 후 유료 요청을 보내지 않는다', as
   mockFetch.mockRejectedValue(new Error('원본 연결 실패'));
   await expect(fetchLotteMartHtml('https://example.com/test', { method: 'GET' }, 100, '', 'remaining-key'))
     .rejects.toThrow('비용 정책');
-  expect(mockFetch.mock.calls.every(([url]) => !String(url).includes('api.zyte.com'))).toBe(true);
+  expect(mockFetch.mock.calls.every(([url]) => new URL(String(url)).hostname !== 'api.zyte.com')).toBe(true);
 });
 
 it('진단은 유료 경로 중지를 표시하고 실제 유료 호출은 하지 않는다', async () => {

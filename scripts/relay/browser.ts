@@ -4,7 +4,7 @@ import type { BrowserRunner } from './oliveyoung.js';
 export function createBrowserRunner(page: Pick<Page, 'evaluate'>): BrowserRunner {
   return async (path, body) => {
     const result = await page.evaluate(async ({ path, body, timeout }) => {
-      const response = await fetch(path, {
+      const response = await fetch(`https://www.oliveyoung.co.kr${path}`, {
         method: 'POST', credentials: 'include',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
         body: JSON.stringify(body), signal: AbortSignal.timeout(timeout),

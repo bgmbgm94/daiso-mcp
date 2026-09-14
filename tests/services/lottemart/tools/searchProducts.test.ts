@@ -77,7 +77,7 @@ describe('createSearchProductsTool', () => {
     const result=await createSearchProductsTool('worker-key').handler({area:'서울',storeCode:'2301',keyword:'콜라'});
     expect(JSON.parse(result.content[0].text).storeCode).toBe('2301');
     expect(String(mockFetch.mock.calls[1][0])).toContain('https://lottemartzetta.com/');
-    expect(mockFetch.mock.calls.every(([url])=>!String(url).includes('api.zyte.com'))).toBe(true);
+    expect(mockFetch.mock.calls.every(([url])=>new URL(String(url)).hostname !== 'api.zyte.com')).toBe(true);
   });
 
   it('source 옵션을 제타 상품 API 경로로 전달한다', async () => {

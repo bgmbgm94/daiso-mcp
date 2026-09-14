@@ -102,6 +102,6 @@ describe('createSearchStoresTool', () => {
       '비용 정책',
     );
     expect(mockFetch).toHaveBeenCalledTimes(1);
-    expect(mockFetch.mock.calls.some(([url]) => String(url).includes('api.zyte.com'))).toBe(false);
+    expect(mockFetch.mock.calls.some(([url]) => new URL(String(url)).hostname === 'api.zyte.com')).toBe(false);
   });
 });

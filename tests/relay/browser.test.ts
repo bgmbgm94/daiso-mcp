@@ -17,7 +17,7 @@ it('브라우저 컨텍스트에서 JSON 요청과 응답을 처리하고 HTML�
   const run = createBrowserRunner(page);
   try {
     expect(await run('/oystore/api/stock/stock-goods-info-v3', {goodsNo:'A1'})).toEqual({status:'SUCCESS'});
-    expect(fetch).toHaveBeenCalledWith('/oystore/api/stock/stock-goods-info-v3', expect.objectContaining({method:'POST',credentials:'include',body:'{"goodsNo":"A1"}',signal:expect.any(AbortSignal)}));
+    expect(fetch).toHaveBeenCalledWith('https://www.oliveyoung.co.kr/oystore/api/stock/stock-goods-info-v3', expect.objectContaining({method:'POST',credentials:'include',body:'{"goodsNo":"A1"}',signal:expect.any(AbortSignal)}));
     fetch.mockResolvedValue(new Response('<html>challenge</html>'));
     await expect(run('/p', {})).rejects.toThrow('브라우저 응답 실패');
     fetch.mockRejectedValue(new Error('network'));
