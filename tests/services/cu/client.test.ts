@@ -98,15 +98,24 @@ describe('fetchCuStores', () => {
     const result = await fetchCuStores({ searchWord: '안산 중앙역' });
 
     expect(mockFetch).toHaveBeenCalledWith(
-      'https://cu.bgfretail.com/store/list_Ajax.do',
+      expect.stringContaining('https://cu.bgfretail.com/store/list_Ajax.do?'),
       expect.objectContaining({
-        method: 'POST',
+        method: 'GET',
         headers: expect.objectContaining({
           'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
           'X-Requested-With': 'XMLHttpRequest',
         }),
       }),
     );
+    const [requestUrl, requestOptions] = mockFetch.mock.calls[0];
+    expect(Object.fromEntries(new URL(requestUrl).searchParams)).toEqual({
+      pageIndex: '1', listType: '', jumpoCode: '', jumpoLotto: '', jumpoToto: '',
+      jumpoCash: '', jumpoHour: '', jumpoCafe: '', jumpoDelivery: '', jumpoBakery: '',
+      jumpoFry: '', jumpoMultiDevice: '', jumpoPosCash: '', jumpoBattery: '',
+      jumpoAdderss: '', jumpoSido: '', jumpoGugun: '', jumpodong: '', searchWord: '안산 중앙역',
+    });
+    expect(requestOptions.body).toBeUndefined();
+    expect(mockFetch).toHaveBeenCalledTimes(1);
     expect(result.totalCount).toBe(1);
     expect(result.stores[0]).toEqual(
       expect.objectContaining({
@@ -130,7 +139,7 @@ describe('fetchCuStores', () => {
     );
   });
 
-  it('웹 검색이 400이면 Zyte로 재시도해 결과를 반환한다', async () => {
+  it.each([400, 403, 429])('웹 GET 검색이 %s이면 기존 POST 형식으로 Zyte 재시도한다', async (status) => {
     const zyteBody = Buffer.from(
       `
       <table>
@@ -147,7 +156,7 @@ describe('fetchCuStores', () => {
     mockFetch
       .mockResolvedValueOnce(
         new Response('bad request', {
-          status: 400,
+          status,
           statusText: 'Bad Request',
         }),
       )
@@ -170,6 +179,13 @@ describe('fetchCuStores', () => {
     expect(result.totalCount).toBe(1);
     expect(result.stores[0].storeName).toBe('안산중앙역에코점');
     expect(mockFetch).toHaveBeenNthCalledWith(2, 'https://api.zyte.com/v1/extract', expect.any(Object));
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    const fallbackBody = JSON.parse(mockFetch.mock.calls[1][1].body);
+    expect(fallbackBody).toMatchObject({
+      url: 'https://cu.bgfretail.com/store/list_Ajax.do',
+      httpRequestMethod: 'POST',
+    });
+    expect(fallbackBody.httpRequestText).toBe(new URL(mockFetch.mock.calls[0][0]).search.slice(1));
   });
 
   it('웹 검색 400 + Zyte 실패 시 원본 에러를 반환한다', async () => {

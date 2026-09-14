@@ -41,15 +41,19 @@ export class HttpError extends Error {
 
 /** HTML 원문을 노출하지 않고 예상하지 못한 응답 형식을 구분합니다. */
 export class UnexpectedHtmlResponseError extends Error {
-  constructor(readonly status: number, readonly contentType: string) {
+  constructor(
+    readonly status: number,
+    readonly contentType: string,
+  ) {
     super(`JSON 대신 HTML 응답을 받았습니다 (HTTP ${status}).`);
     this.name = 'UnexpectedHtmlResponseError';
   }
 }
 
-export function createTimeoutController(
-  timeout: number,
-): { controller: AbortController; timeoutId: ReturnType<typeof setTimeout> } {
+export function createTimeoutController(timeout: number): {
+  controller: AbortController;
+  timeoutId: ReturnType<typeof setTimeout>;
+} {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeout);
   return { controller, timeoutId };
@@ -76,7 +80,11 @@ function normalizeMethod(method: string | undefined): string {
   return (method || 'GET').toUpperCase();
 }
 
-function canRetryMethod(method: string, retryMethods: string[], retryUnsafeMethods: boolean): boolean {
+function canRetryMethod(
+  method: string,
+  retryMethods: string[],
+  retryUnsafeMethods: boolean,
+): boolean {
   return retryUnsafeMethods || retryMethods.map((item) => item.toUpperCase()).includes(method);
 }
 
@@ -99,7 +107,11 @@ function parseRetryAfterDelayMs(response: Response): number | null {
   return null;
 }
 
-export async function fetchWithTimeout(url: string, options: FetchOptions = {}): Promise<Response> {
+async function requestWithTimeout<T>(
+  url: string,
+  options: FetchOptions,
+  readResponse: (response: Response) => Promise<T>,
+): Promise<T> {
   const {
     timeout = 10000,
     retries = 0,
@@ -116,6 +128,7 @@ export async function fetchWithTimeout(url: string, options: FetchOptions = {}):
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     const { controller, timeoutId } = createTimeoutController(timeout);
+    let readingResponse = false;
 
     try {
       const response = await fetch(url, {
@@ -123,7 +136,11 @@ export async function fetchWithTimeout(url: string, options: FetchOptions = {}):
         signal: controller.signal,
       });
 
-      if (retryAllowed && attempt < maxAttempts && isRetryableStatus(response.status, retryStatusCodes)) {
+      if (
+        retryAllowed &&
+        attempt < maxAttempts &&
+        isRetryableStatus(response.status, retryStatusCodes)
+      ) {
         const delayMs = parseRetryAfterDelayMs(response) ?? retryDelayMs;
         onRetry?.({
           attempt,
@@ -139,9 +156,10 @@ export async function fetchWithTimeout(url: string, options: FetchOptions = {}):
         continue;
       }
 
-      return response;
+      readingResponse = true;
+      return await readResponse(response);
     } catch (error) {
-      if (!retryAllowed || attempt >= maxAttempts) {
+      if (readingResponse || !retryAllowed || attempt >= maxAttempts) {
         throw error;
       }
 
@@ -164,26 +182,40 @@ export async function fetchWithTimeout(url: string, options: FetchOptions = {}):
   throw new Error('API 요청 재시도 처리 중 알 수 없는 오류가 발생했습니다.');
 }
 
+export async function fetchWithTimeout(url: string, options: FetchOptions = {}): Promise<Response> {
+  return requestWithTimeout(url, options, async (response) => response);
+}
+
+async function readTextResponse(url: string, options: FetchOptions) {
+  // 헤더 수신뿐 아니라 본문 읽기에도 같은 요청 제한 시간을 적용합니다.
+  return requestWithTimeout(url, options, async (response) => ({
+    response,
+    body: await response.text(),
+  }));
+}
+
 export async function fetchJson<T>(url: string, options: FetchOptions = {}): Promise<T> {
-  const response = await fetchWithTimeout(url, options);
+  const { response, body } = await readTextResponse(url, options);
 
   if (!response.ok) {
-    throw new HttpError(response.status, response.statusText, await response.text());
+    throw new HttpError(response.status, response.statusText, body);
   }
 
-  const body = await response.text();
   if (/^\s*(?:<!doctype\s+html\b|<html\b)/i.test(body)) {
-    throw new UnexpectedHtmlResponseError(response.status, response.headers.get('content-type') || '');
+    throw new UnexpectedHtmlResponseError(
+      response.status,
+      response.headers.get('content-type') || '',
+    );
   }
   return JSON.parse(body) as T;
 }
 
 export async function fetchText(url: string, options: FetchOptions = {}): Promise<string> {
-  const response = await fetchWithTimeout(url, options);
+  const { response, body } = await readTextResponse(url, options);
 
   if (!response.ok) {
-    throw new HttpError(response.status, response.statusText, await response.text());
+    throw new HttpError(response.status, response.statusText, body);
   }
 
-  return response.text();
+  return body;
 }

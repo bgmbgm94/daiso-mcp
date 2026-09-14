@@ -134,6 +134,8 @@ describe('runHealthChecks', () => {
       productNo: 'A1',
       storeCode: 'S1',
       storeName: '매장',
+      movieCode: 'M1',
+      movieName: '영화',
       theaterCode: 'T1',
       theaterName: '극장',
     };
@@ -147,6 +149,7 @@ describe('runHealthChecks', () => {
                 products: [representative],
                 stores: [representative],
                 theaters: [representative],
+                movies: [representative],
                 inventory: {
                   products: [representative],
                   items: [representative],

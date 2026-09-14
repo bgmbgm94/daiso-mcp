@@ -5,6 +5,41 @@ import { ACTION_QUERY_ACTIONS } from '../api/actionsProxy.js';
 
 export const ACTION_QUERY_PARAMETERS = [
   {
+    name: 'cinemaCode',
+    in: 'query',
+    required: false,
+    description: '디트릭스 극장 코드',
+    schema: { type: 'string' },
+  },
+  {
+    name: 'brandCode',
+    in: 'query',
+    required: false,
+    description: '디트릭스 브랜드 코드',
+    schema: { type: 'string' },
+  },
+  {
+    name: 'region',
+    in: 'query',
+    required: false,
+    description: '디트릭스 광역 지역명',
+    schema: { type: 'string' },
+  },
+  {
+    name: 'movieName',
+    in: 'query',
+    required: false,
+    description: '디트릭스 영화명 부분 일치',
+    schema: { type: 'string' },
+  },
+  {
+    name: 'includePlayDates',
+    in: 'query',
+    required: false,
+    description: '디트릭스 상영 가능 날짜 포함',
+    schema: { type: 'boolean' },
+  },
+  {
     name: 'action',
     in: 'query',
     required: true,
@@ -392,7 +427,7 @@ export const ACTION_QUERY_PARAMETERS = [
     name: 'timeoutMs',
     in: 'query',
     required: false,
-    description: '세븐일레븐 inventory 타임아웃',
+    description: '원본 요청 타임아웃(ms), 디트릭스는 1~60000',
     schema: { type: 'integer' },
   },
 ] as const;

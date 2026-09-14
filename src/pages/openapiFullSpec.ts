@@ -15,6 +15,7 @@ import { OPENAPI_PATHS_PLACES } from './openapiSpecPathsPlaces.js';
 import { OPENAPI_PATHS_OPINET } from './openapiSpecPathsOpinet.js';
 import { OPENAPI_PATHS_COMPARE } from './openapiSpecPathsCompare.js';
 import { OPENAPI_PATHS_FEEDBACK } from './openapiSpecPathsFeedback.js';
+import { OPENAPI_PATHS_DTRYX } from './openapiSpecPathsDtryx.js';
 import { OPENAPI_COMPONENTS } from './openapiSpecComponents.js';
 
 export function generateFullOpenApiSpec(baseUrl: string): object {
@@ -65,6 +66,7 @@ export function generateFullOpenApiSpec(baseUrl: string): object {
       ...OPENAPI_PATHS_MEGABOX,
       ...OPENAPI_PATHS_LOTTECINEMA,
       ...OPENAPI_PATHS_CGV,
+      ...OPENAPI_PATHS_DTRYX,
     },
     components: OPENAPI_COMPONENTS,
   };

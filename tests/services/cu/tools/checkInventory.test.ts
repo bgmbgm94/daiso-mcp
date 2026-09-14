@@ -250,7 +250,7 @@ describe('createCheckInventoryTool', () => {
     expect(parsed.location).toBeNull();
     expect(parsed.nearbyStores.stores[0].storeName).toBe('안산중앙역에코점');
     expect(mockFetch).toHaveBeenLastCalledWith(
-      'https://cu.bgfretail.com/store/list_Ajax.do',
+      expect.stringContaining('https://cu.bgfretail.com/store/list_Ajax.do?'),
       expect.any(Object),
     );
   });

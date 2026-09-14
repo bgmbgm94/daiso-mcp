@@ -10,6 +10,9 @@ export interface ActionQueryDefinition {
 }
 
 export const ACTION_QUERY_DEFINITIONS: ActionQueryDefinition[] = [
+  { action: 'dtryxListCinemas', summary: '디트릭스 극장 목록', targetPath: '/api/dtryx/cinemas' },
+  { action: 'dtryxListNowShowing', summary: '디트릭스 상영작', targetPath: '/api/dtryx/movies' },
+  { action: 'dtryxGetRemainingSeats', summary: '디트릭스 잔여 좌석', targetPath: '/api/dtryx/seats' },
   { action: 'daisoSearchProducts', summary: '다이소 제품 검색', targetPath: '/api/daiso/products' },
   {
     action: 'daisoGetProduct',

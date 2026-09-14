@@ -63,3 +63,45 @@ describe('errorResponse', () => {
     );
   });
 });
+
+describe('설정 오류 진단', () => {
+  it.each([
+    'Zyte API 호출 실패: 403 Your account has been suspended.',
+    'Zyte API 호출 실패: 403 account suspended',
+    'ZYTE_API_KEY가 설정되지 않았습니다. .env 또는 Cloudflare Worker Secret을 확인해주세요.',
+  ])('설정 오류는 재시도 대신 운영자 조치를 안내한다: %s', (message) => {
+    const result = toStandardErrorDiagnostics('GS25_PRODUCT_SEARCH_FAILED', message, {
+      status: 500,
+    });
+    expect(result).toMatchObject({ message, status: 500, retryable: false });
+    expect(result.hint).toContain('운영자');
+    expect(result.hint).toContain('ZYTE_API_KEY');
+    expect(result.hint).toContain('계정');
+  });
+
+  it.each([
+    ['GS25_PRODUCT_SEARCH_FAILED', 'Zyte API 호출 실패: 403 Forbidden', 500, 403],
+    ['GS25_PRODUCT_SEARCH_FAILED', 'upstream account suspended', 500, 403],
+    ['GS25_PRODUCT_SEARCH_FAILED', 'Zyte API 호출 실패: 503 unavailable', 503, undefined],
+    ['GS25_PRODUCT_SEARCH_FAILED', 'rate limited', 429, undefined],
+    ['GS25_TIMEOUT', 'timeout', undefined, undefined],
+    ['GS25_TIMEOUT', 'timeout', 408, undefined],
+  ])('일반 외부 오류는 재시도 판단을 유지한다: %s %s', (code, message, status, upstreamStatus) => {
+    expect(toStandardErrorDiagnostics(code, message, { status, upstreamStatus })).toMatchObject({
+      retryable: true,
+      hint: '일시적인 외부 서비스 오류일 수 있습니다. 잠시 후 다시 시도하세요.',
+    });
+  });
+});
+
+describe('GS25 인증 장애 안내', () => {
+  it('인증 오류에 자동 재시도를 권하지 않는다', () => {
+    const diagnostics = toStandardErrorDiagnostics(
+      'GS25_UPSTREAM_UNAVAILABLE',
+      'GS25 재고 서비스 인증을 사용할 수 없습니다. 운영자는 GS25_API_KEY 설정을 확인하세요.',
+      { status: 503 },
+    );
+    expect(diagnostics.retryable).toBe(false);
+    expect(diagnostics.hint).toContain('GS25_API_KEY');
+  });
+});

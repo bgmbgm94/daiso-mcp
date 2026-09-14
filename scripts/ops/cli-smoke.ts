@@ -30,6 +30,7 @@ type SmokeService =
   | 'megabox'
   | 'lottecinema'
   | 'cgv'
+  | 'dtryx'
   | 'opinet';
 
 interface CliSmokeDeps {
@@ -169,8 +170,8 @@ export const CLI_SMOKE_COMMANDS: CliSmokeCommand[] = [
   },
   {
     service: 'megabox',
-    scenario: '메가박스 get 위치 검색',
-    args: ['get', '/api/megabox/theaters', '--keyword', '강남', '--limit', '1', '--json'],
+    scenario: '메가박스 위치 검색',
+    args: ['megabox-theaters', '강남', '--limit', '1', '--json'],
     validate: (stdout) => validateApiEnvelope(stdout, expectDataField('keyword', '강남')),
   },
   {
@@ -190,6 +191,15 @@ export const CLI_SMOKE_COMMANDS: CliSmokeCommand[] = [
     scenario: '오피넷 전국 평균 유가 조회',
     args: ['get', '/api/opinet/average', '--json'],
     validate: (stdout) => validateApiEnvelope(stdout, expectDataField('provider', 'opinet')),
+  },
+  {
+    service: 'dtryx', scenario: '디트릭스 상영작 조회',
+    args: ['get', '/api/dtryx/movies', '--cinemaCode', '000067', '--json'],
+    validate: (stdout) => validateApiEnvelope(stdout, (data) => {
+      const first = Array.isArray(data.movies) ? data.movies[0] : undefined;
+      return isRecord(first) && typeof first.movieCode === 'string' && typeof first.movieName === 'string'
+        ? null : '디트릭스 상영작의 movieCode 또는 movieName이 없습니다';
+    }),
   },
 ];
 

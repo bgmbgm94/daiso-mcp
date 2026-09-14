@@ -50,11 +50,14 @@ describe('runCliSmoke', () => {
         'seveneleven-products': { success: true, data: { query: '커피' } },
         'emart24-products': { success: true, data: { keyword: '커피' } },
         'lottemart-products': { success: true, data: { keyword: '콜라' } },
+        'megabox-theaters': { success: true, data: { keyword: '강남' } },
         'lottecinema-theaters': { success: true, data: { keyword: '잠실' } },
       };
       const path = args[2];
       const getPayload =
-        path === '/api/oliveyoung/products'
+        path === '/api/dtryx/movies'
+          ? { success: true, data: { movies: [{ movieCode: '1', movieName: '영화' }] } }
+          : path === '/api/oliveyoung/products'
           ? { success: true, data: { keyword: '선크림' } }
           : path === '/api/megabox/theaters' || path === '/api/cgv/theaters'
             ? { success: true, data: { keyword: '강남' } }
@@ -220,11 +223,14 @@ describe('runCliSmoke', () => {
         'seveneleven-products': { success: true, data: { query: '커피' } },
         'emart24-products': { success: true, data: { keyword: '커피' } },
         'lottemart-products': { success: true, data: { keyword: '콜라' } },
+        'megabox-theaters': { success: true, data: { keyword: '강남' } },
         'lottecinema-theaters': { success: true, data: { keyword: null } },
       };
       const path = args[2];
       const getPayload =
-        path === '/api/oliveyoung/products'
+        path === '/api/dtryx/movies'
+          ? { success: true, data: { movies: [{ movieCode: '1', movieName: '영화' }] } }
+          : path === '/api/oliveyoung/products'
           ? { success: true, data: { keyword: '선크림' } }
           : path === '/api/megabox/theaters' || path === '/api/cgv/theaters'
             ? { success: true, data: { keyword: '강남' } }
