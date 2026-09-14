@@ -73,6 +73,9 @@ Use `--json` for structured output. In shell commands, quoted Korean strings are
 - Lotte Cinema theaters: `npx daiso lottecinema-theaters 잠실 --limit 10 --json`
 - Lotte Cinema movies: `npx daiso get /api/lottecinema/movies --theaterId <theaterId> --json`
 - Lotte Cinema seats: `npx daiso get /api/lottecinema/seats --theaterId <theaterId> --movieId <movieId> --playDate <YYYYMMDD> --json`
+- Megabox theaters: `npx daiso megabox-theaters 강남 --limit 10 --json`
+- Megabox movies: `npx daiso megabox-movies --theaterId <theaterId> --playDate <YYYYMMDD> --json`
+- Megabox seats: `npx daiso megabox-seats --theaterId <theaterId> --movieId <movieId> --playDate <YYYYMMDD> --json`
 - CGV theaters: `npx daiso cgv-theaters 강남 --limit 10 --json`
 - CGV movies: `npx daiso cgv-movies --playDate <YYYYMMDD> --theaterCode <theaterCode> --json`
 - CGV timetable: `npx daiso cgv-timetable --playDate <YYYYMMDD> --theaterCode <theaterCode> --json`
@@ -84,3 +87,15 @@ Use `--json` for structured output. In shell commands, quoted Korean strings are
 - MCP URL: `npx daiso url`
 - Help: `npx daiso help`
 - Command help: `npx daiso help products`
+
+## 디트릭스 독립·예술영화관
+
+전용 명령 대신 범용 GET을 사용합니다. 극장 카탈로그는 확인된 22곳이며 전체 제휴 극장을 보장하지 않습니다.
+
+```bash
+daiso get /api/dtryx/cinemas --region 서울
+daiso get /api/dtryx/movies --keyword 모모 --includePlayDates true
+daiso get /api/dtryx/seats --region 서울 --limit 20
+```
+
+상영작은 cinemaCode 또는 keyword가 필요합니다. 날짜는 YYYYMMDD 또는 YYYY-MM-DD이며 기본값은 한국 날짜 기준 오늘입니다. 일부 극장 실패는 failedCinemas에 표시하고 전체 실패는 오류입니다.

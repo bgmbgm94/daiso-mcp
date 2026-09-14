@@ -22,6 +22,15 @@ export const SEVENELEVEN_UPSTREAM_403_PATTERNS = [
 
 export const HEALTH_CHECKS: HealthCheckDefinition[] = [
   {
+    id: 'dtryx.movies',
+    service: 'dtryx',
+    target: 'movies',
+    mode: 'deep',
+    path: '/api/dtryx/movies?cinemaCode=000067',
+    collectionKey: 'movies',
+    requiredFields: ['movieCode', 'movieName'],
+  },
+  {
     id: 'cli.contract',
     service: 'cli',
     target: 'api-contract',

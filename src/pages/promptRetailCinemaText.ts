@@ -3,7 +3,15 @@
  */
 
 export function buildPromptRetailCinemaText(baseUrl: string): string {
-  return `### 6-0. 키 없는 통합 상품 가격 후보 비교
+  return `### 디트릭스 독립·예술영화관
+
+- 극장 카탈로그: ${baseUrl}/api/dtryx/cinemas?region=서울
+- 상영작: ${baseUrl}/api/dtryx/movies?keyword=모모&includePlayDates=true
+- 회차와 잔여 좌석: ${baseUrl}/api/dtryx/seats?region=서울
+
+상영작 조회는 cinemaCode 또는 keyword가 필요합니다. 날짜 기본값은 한국 날짜 기준 오늘이며 YYYYMMDD 또는 YYYY-MM-DD를 받습니다. 지역·극장명·브랜드 필터는 함께 적용합니다. 카탈로그는 확인된 22곳이며 전체 제휴 극장이 아닙니다. 일부 실패는 failedCinemas로 표시하고 전체 조회 실패는 오류입니다.
+
+### 6-0. 키 없는 통합 상품 가격 후보 비교
 
 **설명**: 새 외부 API 키 없이 기존 다이소, GS25, 세븐일레븐, 이마트24 상품 검색을 묶어 가격 후보를 비교합니다. 실제 매장 재고와 행사가까지 확정하는 기능이 아니라 "어디가 싸 보이는지"를 빠르게 고르는 1차 검색입니다.
 

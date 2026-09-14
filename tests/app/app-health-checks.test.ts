@@ -579,6 +579,8 @@ describe('GET /api/health/checks', () => {
       branchName: '강남점',
       storeCode: 'S1',
       storeName: '강남점',
+      movieCode: 'M1',
+      movieName: '영화',
       theaterCode: 'T1',
       theaterName: '강남점',
     };
@@ -592,6 +594,7 @@ describe('GET /api/health/checks', () => {
                 products: [representative],
                 stores: [representative],
                 theaters: [representative],
+                movies: [representative],
                 inventory: {
                   products: [representative],
                   items: [representative],

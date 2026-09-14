@@ -5,10 +5,16 @@
  */
 
 import { createInterface } from 'node:readline/promises';
-import { stdin as input, stdout as output } from 'node:process';
+import process from 'node:process';
 import { pickFromList } from './cliPicker.js';
 import { fetchEnvelope, fetchStoresWithKeywordFallback } from './cli/interactiveFetch.js';
-import { askMenu, askNextAction, askNonEmpty, askYesNo, printStoreDetail } from './cli/interactivePrompt.js';
+import {
+  askMenu,
+  askNextAction,
+  askNonEmpty,
+  askYesNo,
+  printStoreDetail,
+} from './cli/interactivePrompt.js';
 import type { InteractiveCliDeps, InteractivePrompt } from './cli/interactiveTypes.js';
 import {
   parseLotteCinemaTheaters,
@@ -18,7 +24,13 @@ import {
   runLotteCinemaSearch,
   runOliveyoungItemSearch,
 } from './cli/interactiveItemSearch.js';
-import { buildDaisoStoreKeywordVariants, isRecord, parseDaisoProducts, parseStores, toText } from './utils/cliInteractiveHelpers.js';
+import {
+  buildDaisoStoreKeywordVariants,
+  isRecord,
+  parseDaisoProducts,
+  parseStores,
+  toText,
+} from './utils/cliInteractiveHelpers.js';
 
 export type { InteractiveCliDeps } from './cli/interactiveTypes.js';
 
@@ -41,7 +53,11 @@ export function inferDaisoFreeTextIntent(input: string): DaisoFreeTextIntent {
   const locationIndex = tokens.findIndex(isLocationToken);
   if (locationIndex >= 0) {
     const storeKeyword = tokens[locationIndex];
-    const productQuery = tokens.filter((_, index) => index !== locationIndex).join(' ').trim() || input.trim();
+    const productQuery =
+      tokens
+        .filter((_, index) => index !== locationIndex)
+        .join(' ')
+        .trim() || input.trim();
     return { productQuery, storeKeyword };
   }
 
@@ -74,7 +90,7 @@ async function askServiceChoice(
 }
 
 function createPrompt(): InteractivePrompt {
-  const rl = createInterface({ input, output });
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
 
   return {
     ask: async (question: string) => {
@@ -133,7 +149,11 @@ export async function runInteractiveCli(deps: InteractiveCliDeps): Promise<numbe
         deps.writeOut(`- 상품 키워드: ${intent.productQuery}`);
         deps.writeOut(`- 위치 키워드: ${intent.storeKeyword}`);
 
-        const storeResult = await fetchStoresWithKeywordFallback(deps.fetchImpl, 'daiso', intent.storeKeyword);
+        const storeResult = await fetchStoresWithKeywordFallback(
+          deps.fetchImpl,
+          'daiso',
+          intent.storeKeyword,
+        );
         const stores = storeResult.stores;
         if (stores.length === 0) {
           deps.writeOut('검색된 매장이 없습니다.');
@@ -142,20 +162,21 @@ export async function runInteractiveCli(deps: InteractiveCliDeps): Promise<numbe
           continue;
         }
 
-        const selectedStore = stores.length === 1
-          ? stores[0]
-          : await pickFromList({
-              prompt,
-              writeOut: deps.writeOut,
-              title: '[매장 선택]',
-              emptyText: '검색된 매장이 없습니다.',
-              cancelText: '매장 검색으로 돌아갑니다.',
-              items: stores,
-              renderItem: (store, index) =>
-                `${index + 1}. ${store.name} | ${store.address || '주소 정보 없음'}`,
-              filterText: (store) => `${store.name} ${store.address} ${store.phone}`,
-              indexText: '입력: 번호 선택 | /키워드 필터 | all 전체보기 | 0 다시 검색',
-            });
+        const selectedStore =
+          stores.length === 1
+            ? stores[0]
+            : await pickFromList({
+                prompt,
+                writeOut: deps.writeOut,
+                title: '[매장 선택]',
+                emptyText: '검색된 매장이 없습니다.',
+                cancelText: '매장 검색으로 돌아갑니다.',
+                items: stores,
+                renderItem: (store, index) =>
+                  `${index + 1}. ${store.name} | ${store.address || '주소 정보 없음'}`,
+                filterText: (store) => `${store.name} ${store.address} ${store.phone}`,
+                indexText: '입력: 번호 선택 | /키워드 필터 | all 전체보기 | 0 다시 검색',
+              });
         if (!selectedStore) {
           continue;
         }
@@ -230,7 +251,11 @@ export async function runInteractiveCli(deps: InteractiveCliDeps): Promise<numbe
 
       const service = serviceChoice === 1 ? 'daiso' : serviceChoice === 2 ? 'oliveyoung' : 'cu';
       const storeKeyword = await askNonEmpty(prompt, '매장 검색 키워드를 입력하세요: ');
-      const storeResult = await fetchStoresWithKeywordFallback(deps.fetchImpl, service, storeKeyword);
+      const storeResult = await fetchStoresWithKeywordFallback(
+        deps.fetchImpl,
+        service,
+        storeKeyword,
+      );
       const stores = storeResult.stores;
 
       if (service === 'daiso' && stores.length > 0 && storeResult.matchedKeyword !== storeKeyword) {

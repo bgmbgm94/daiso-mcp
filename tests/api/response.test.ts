@@ -93,3 +93,15 @@ describe('설정 오류 진단', () => {
     });
   });
 });
+
+describe('GS25 인증 장애 안내', () => {
+  it('인증 오류에 자동 재시도를 권하지 않는다', () => {
+    const diagnostics = toStandardErrorDiagnostics(
+      'GS25_UPSTREAM_UNAVAILABLE',
+      'GS25 재고 서비스 인증을 사용할 수 없습니다. 운영자는 GS25_API_KEY 설정을 확인하세요.',
+      { status: 503 },
+    );
+    expect(diagnostics.retryable).toBe(false);
+    expect(diagnostics.hint).toContain('GS25_API_KEY');
+  });
+});

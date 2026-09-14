@@ -24,6 +24,36 @@ paths:
       summary: 공통 GET 액션 실행
       description: action 값에 따라 기존 GET API 엔드포인트로 프록시합니다. OpenAI Actions 등록 시 이 단일 엔드포인트를 사용하세요.
       parameters:
+        - name: cinemaCode
+          in: query
+          required: false
+          description: 디트릭스 극장 코드
+          schema:
+            type: string
+        - name: brandCode
+          in: query
+          required: false
+          description: 디트릭스 브랜드 코드
+          schema:
+            type: string
+        - name: region
+          in: query
+          required: false
+          description: 디트릭스 광역 지역명
+          schema:
+            type: string
+        - name: movieName
+          in: query
+          required: false
+          description: 디트릭스 영화명 부분 일치
+          schema:
+            type: string
+        - name: includePlayDates
+          in: query
+          required: false
+          description: 디트릭스 상영 가능 날짜 포함
+          schema:
+            type: boolean
         - name: action
           in: query
           required: true
@@ -31,6 +61,9 @@ paths:
           schema:
             type: string
             enum:
+              - dtryxListCinemas
+              - dtryxListNowShowing
+              - dtryxGetRemainingSeats
               - daisoSearchProducts
               - daisoGetProduct
               - daisoFindStores
@@ -389,7 +422,7 @@ paths:
         - name: timeoutMs
           in: query
           required: false
-          description: 세븐일레븐 inventory 타임아웃
+          description: 원본 요청 타임아웃(ms), 디트릭스는 1~60000
           schema:
             type: integer
       responses:

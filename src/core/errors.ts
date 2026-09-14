@@ -23,6 +23,7 @@ const SERVICE_PREFIXES = [
   'megabox',
   'lottecinema',
   'cgv',
+  'dtryx',
   'oliveyoung',
 ] as const;
 
@@ -87,8 +88,13 @@ export function toStandardErrorDiagnostics(
     'Zyte API 호출 실패: 403 account suspended',
     'ZYTE_API_KEY가 설정되지 않았습니다.',
   ].some((diagnostic) => message.includes(diagnostic));
+  const gs25AuthenticationError =
+    code === 'GS25_UPSTREAM_UNAVAILABLE' &&
+    message.includes('GS25 재고 서비스 인증을 사용할 수 없습니다.');
   const retryable =
-    !configurationError && isRetryable(code, options.status || options.upstreamStatus);
+    !configurationError &&
+    !gs25AuthenticationError &&
+    isRetryable(code, options.status || options.upstreamStatus);
 
   return {
     code,
@@ -98,9 +104,11 @@ export function toStandardErrorDiagnostics(
     service: options.service || inferred.service,
     operation: options.operation || inferred.operation,
     upstreamStatus: options.upstreamStatus,
-    hint: configurationError
-      ? '운영자는 ZYTE_API_KEY 설정과 Zyte 계정 상태를 확인하세요.'
-      : buildHint(retryable),
+    hint: gs25AuthenticationError
+      ? '운영자는 GS25_API_KEY 설정을 확인하세요.'
+      : configurationError
+        ? '운영자는 ZYTE_API_KEY 설정과 Zyte 계정 상태를 확인하세요.'
+        : buildHint(retryable),
   };
 }
 

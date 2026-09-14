@@ -133,10 +133,10 @@ async function requestCuWebHtml(
   const form = new URLSearchParams(body);
   const formText = form.toString();
   const targetUrl = `${CU_API.WEB_BASE_URL}${path}`;
-  const response = await fetch(`${CU_API.WEB_BASE_URL}${path}`, {
-    method: 'POST',
+  // 공식 웹의 GET 조회는 같은 검색 조건을 지원하며 추가 재시도 시간을 쓰지 않습니다.
+  const response = await fetch(`${targetUrl}?${formText}`, {
+    method: 'GET',
     headers: CU_WEB_DEFAULT_HEADERS,
-    body: formText,
     signal: AbortSignal.timeout(timeout),
   });
 
