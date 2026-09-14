@@ -14,6 +14,7 @@ interface ToolListResult {
 }
 
 interface ToolCallResult {
+  isError?: boolean;
   content?: Array<{ type: string; text?: string }>;
 }
 
@@ -56,7 +57,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function parseToolPayload(result: ToolCallResult): Record<string, unknown> {
-  const text = result.content?.find((item) => item.type === 'text' && typeof item.text === 'string')?.text;
+  const text = result.content?.find(
+    (item) => item.type === 'text' && typeof item.text === 'string',
+  )?.text;
+  if (result.isError) {
+    throw new Error(text || 'MCP 도구 호출이 오류를 반환했습니다');
+  }
   if (!text) {
     throw new Error('도구 호출 결과에 text content가 없습니다');
   }
@@ -70,7 +76,9 @@ function parseToolPayload(result: ToolCallResult): Record<string, unknown> {
 }
 
 function createResponseExcerpt(result: ToolCallResult | undefined): string {
-  const text = result?.content?.find((item) => item.type === 'text' && typeof item.text === 'string')?.text;
+  const text = result?.content?.find(
+    (item) => item.type === 'text' && typeof item.text === 'string',
+  )?.text;
   return (text || JSON.stringify(result ?? {})).replace(/\s+/g, ' ').slice(0, 500);
 }
 
@@ -87,8 +95,12 @@ function formatScenarioFailure(
   ].join(' ');
 }
 
-function expectField(fieldName: string, expected: unknown): (payload: Record<string, unknown>) => string | null {
-  return (payload) => (payload[fieldName] === expected ? null : `${fieldName} 값이 ${String(expected)}가 아닙니다`);
+function expectField(
+  fieldName: string,
+  expected: unknown,
+): (payload: Record<string, unknown>) => string | null {
+  return (payload) =>
+    payload[fieldName] === expected ? null : `${fieldName} 값이 ${String(expected)}가 아닙니다`;
 }
 
 function validateDaisoInventoryByName(payload: Record<string, unknown>): string | null {
@@ -163,7 +175,9 @@ export async function runMcpSmoke(deps: McpSmokeDeps = {}): Promise<number> {
   const writeOut = deps.writeOut || ((message: string) => process.stdout.write(`${message}\n`));
   const writeErr = deps.writeErr || ((message: string) => process.stderr.write(`${message}\n`));
   const service = deps.service || parseServiceArg(process.argv.slice(2));
-  const smokeTools = service ? MCP_SMOKE_TOOLS.filter((tool) => tool.service === service) : MCP_SMOKE_TOOLS;
+  const smokeTools = service
+    ? MCP_SMOKE_TOOLS.filter((tool) => tool.service === service)
+    : MCP_SMOKE_TOOLS;
   const scenarios = service
     ? MCP_SMOKE_SCENARIOS.filter((scenario) => scenario.service === service)
     : MCP_SMOKE_SCENARIOS;
@@ -207,9 +221,7 @@ export async function runMcpSmoke(deps: McpSmokeDeps = {}): Promise<number> {
       }
     }
 
-    writeOut(
-      `MCP smoke 통과: ${smokeTools.length}개 도구 확인 및 ${scenarios.length}개 호출 완료`,
-    );
+    writeOut(`MCP smoke 통과: ${smokeTools.length}개 도구 확인 및 ${scenarios.length}개 호출 완료`);
     return 0;
   } catch (error) {
     const message = error instanceof Error ? error.message : '알 수 없는 오류';

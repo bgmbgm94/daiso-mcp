@@ -38,7 +38,9 @@ function toOperation(parts: string[]): string | undefined {
   return filtered.map((part) => part.toLowerCase()).join('_');
 }
 
-function inferServiceAndOperation(code: string): Pick<StandardErrorDiagnostics, 'service' | 'operation'> {
+function inferServiceAndOperation(
+  code: string,
+): Pick<StandardErrorDiagnostics, 'service' | 'operation'> {
   const parts = code.split('_').filter((part) => part.length > 0);
   const normalizedFirst = normalizeService(parts[0] || '');
   const service = SERVICE_PREFIXES.find((item) => normalizeService(item) === normalizedFirst);
@@ -79,7 +81,14 @@ export function toStandardErrorDiagnostics(
   } = {},
 ): StandardErrorDiagnostics {
   const inferred = inferServiceAndOperation(code);
-  const retryable = isRetryable(code, options.status || options.upstreamStatus);
+  // 실제 Zyte 진단 문구만 설정 오류로 취급해 일반적인 접근 차단과 구분합니다.
+  const configurationError = [
+    'Zyte API 호출 실패: 403 Your account has been suspended.',
+    'Zyte API 호출 실패: 403 account suspended',
+    'ZYTE_API_KEY가 설정되지 않았습니다.',
+  ].some((diagnostic) => message.includes(diagnostic));
+  const retryable =
+    !configurationError && isRetryable(code, options.status || options.upstreamStatus);
 
   return {
     code,
@@ -89,7 +98,9 @@ export function toStandardErrorDiagnostics(
     service: options.service || inferred.service,
     operation: options.operation || inferred.operation,
     upstreamStatus: options.upstreamStatus,
-    hint: buildHint(retryable),
+    hint: configurationError
+      ? '운영자는 ZYTE_API_KEY 설정과 Zyte 계정 상태를 확인하세요.'
+      : buildHint(retryable),
   };
 }
 
