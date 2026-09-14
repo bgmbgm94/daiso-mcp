@@ -83,11 +83,11 @@
 **[실시간 서비스 상태 보기](https://aka-page.betteruptime.com/)**
 
 <!-- WORKERS_INVOCATIONS_CHART:START -->
-<h3>Cloudflare 요청 수 (2026-08-15 ~ 2026-09-13, 30일)</h3>
+<h3>Cloudflare 요청 수 (2026-08-16 ~ 2026-09-14, 30일)</h3>
 
-<img src="./assets/analytics/workers-invocations.png?v=2026-09-13T18:14:05.938Z" alt="Cloudflare 요청 수 그래프 (2026-08-15 ~ 2026-09-13)" width="100%">
+<img src="./assets/analytics/workers-invocations.png?v=2026-09-14T19:51:30.925Z" alt="Cloudflare 요청 수 그래프 (2026-08-16 ~ 2026-09-14)" width="100%">
 
-<sub>기준 워커: <code>daiso-mcp</code> · 마지막 갱신: 2026-09-14 03:14 KST</sub>
+<sub>기준 워커: <code>daiso-mcp</code> · 마지막 갱신: 2026-09-15 04:51 KST</sub>
 <br><sub>집계: Worker 실행 + 루트 GET 리디렉션 요청 · 사용자 수와 다릅니다.</sub>
 
 </div>
