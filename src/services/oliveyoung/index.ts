@@ -19,6 +19,8 @@ interface OliveyoungServiceOptions {
   zyteApiKey?: string;
   relayUrl?: string;
   relayToken?: string;
+  accessClientId?: string;
+  accessClientSecret?: string;
 }
 
 class OliveyoungService implements ServiceProvider {

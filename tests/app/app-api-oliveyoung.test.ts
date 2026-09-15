@@ -156,10 +156,10 @@ describe('GET /api/oliveyoung/inventory', () => {
 it('Worker 바인딩의 릴레이 설정을 REST 상품 검색에 전달한다', async () => {
   mockFetch.mockResolvedValue(Response.json({ status: 'SUCCESS', data: { totalCount: 0 } }));
   const response = await app.request('/api/oliveyoung/products?keyword=relay-binding-proof', undefined, {
-    OY_RELAY_URL: 'https://relay.example', OY_RELAY_TOKEN: 'trusted-token',
+    OY_RELAY_URL: 'https://relay.example', OY_RELAY_TOKEN: 'trusted-token', OY_ACCESS_CLIENT_ID: 'access-id', OY_ACCESS_CLIENT_SECRET: 'access-secret',
   });
   expect(response.status).toBe(200);
   expect(mockFetch).toHaveBeenCalledWith('https://relay.example/v1/oliveyoung/product-search-v3', expect.objectContaining({
-    headers: expect.objectContaining({ Authorization: 'Bearer trusted-token' }),
+    headers: expect.objectContaining({ Authorization: 'Bearer trusted-token', 'CF-Access-Client-Id':'access-id', 'CF-Access-Client-Secret':'access-secret' }),
   }));
 });

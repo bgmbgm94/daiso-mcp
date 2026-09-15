@@ -114,6 +114,8 @@ const createRegistry = (bindings?: AppBindings) => {
       createOliveyoungService({
         relayUrl: bindings?.OY_RELAY_URL,
         relayToken: bindings?.OY_RELAY_TOKEN,
+        accessClientId: bindings?.OY_ACCESS_CLIENT_ID,
+        accessClientSecret: bindings?.OY_ACCESS_CLIENT_SECRET,
       }),
   ]);
 

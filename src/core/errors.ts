@@ -96,6 +96,7 @@ export function toStandardErrorDiagnostics(
   const oliveyoungRelayConfigurationError = [
     '올리브영 릴레이 URL은 HTTPS 또는 로컬 HTTP 주소여야 합니다.',
     'OY_RELAY_TOKEN이 필요합니다.',
+    '올리브영 Access 서비스 토큰 설정이 필요합니다.',
     '올리브영 직접 요청 실패. 운영자는 OY_RELAY_URL과 OY_RELAY_TOKEN으로 브라우저 릴레이를 설정해주세요.',
   ].includes(message);
   const retryable =

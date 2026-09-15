@@ -30,12 +30,12 @@ Cloudflare Worker에서 쓰려면 승인된 별도 연결 경로가 필요합니
 
 `POST /v1/oliveyoung/{operation}`에 JSON 본문과 `Authorization: Bearer …`를 보냅니다. 대상 호스트는 `https://www.oliveyoung.co.kr`로 고정하며 임의 URL은 받지 않습니다.
 
-| operation | JSON 필드 |
-| --- | --- |
-| `find-store` | `lat`, `lon`, `pageIdx`, `searchWords`, `pogKeys`, `serviceKeys`, `mapLat`, `mapLon` |
-| `product-search-v3` | `includeSoldOut`, `keyword`, `page`, `sort`, `size` |
-| `stock-goods-info-v3` | `goodsNo` |
-| `stock-stores` | `productId`, `lat`, `lon`, `pageIdx`, `searchWords`, `mapLat`, `mapLon` |
+| operation             | JSON 필드                                                                            |
+| --------------------- | ------------------------------------------------------------------------------------ |
+| `find-store`          | `lat`, `lon`, `pageIdx`, `searchWords`, `pogKeys`, `serviceKeys`, `mapLat`, `mapLon` |
+| `product-search-v3`   | `includeSoldOut`, `keyword`, `page`, `sort`, `size`                                  |
+| `stock-goods-info-v3` | `goodsNo`                                                                            |
+| `stock-stores`        | `productId`, `lat`, `lon`, `pageIdx`, `searchWords`, `mapLat`, `mapLon`              |
 
 숫자·문자열·불리언 타입과 필드 목록을 검증합니다. 요청 본문은 최대 16 KiB입니다. 인증 실패는 브라우저 작업 전에 401, 잘못된 경로는 404, 잘못된 본문은 400/413입니다. 한 브라우저 작업만 동시에 실행하며, 실행·대기를 합쳐 8개를 넘으면 503입니다. 취소되었거나 15초 이상 대기한 요청은 실행하지 않습니다. 브라우저 fetch는 본문을 읽을 때까지 15초 제한을 적용합니다. 정상 HTTP 200과 `SUCCESS` JSON만 반환하며, HTML·상태 오류·네트워크 실패는 원문이나 비밀을 노출하지 않는 502가 됩니다.
 
@@ -50,3 +50,46 @@ Cloudflare Worker에서 쓰려면 승인된 별도 연결 경로가 필요합니
 - 테스트: `npx vitest run tests/relay tests/services/oliveyoung tests/api/oliveyoung-handlers.test.ts tests/app/app-api-oliveyoung.test.ts tests/app/app-api-actions.test.ts`.
 
 공개 Worker에서 이 로컬 Mac으로 연결되는 경로는 이번 smoke로 검증한 범위에 포함되지 않습니다.
+
+## 상시 운영 보강
+
+중계는 한 브라우저·한 컨텍스트·한 페이지를 재사용합니다. 요청마다 탭을 만들지 않습니다. 추가 페이지는 즉시 회수하며 회수 실패·페이지 crash·Node 측 watchdog timeout에는 소유한 브라우저 세션을 폐기합니다. 200회 조회 또는 30분 사용 후 유휴 경계에서 정리하고 다음 요청에 새 세션을 만듭니다.
+
+브라우저는 별도 guard 프로세스가 소유합니다. 중계 부모가 SIGKILL로 종료되어도 IPC 단절을 감지해 회수합니다. PID·생성 시각·프로세스 그룹을 확인한 소유 프로세스만 종료합니다. macOS에서 별도 그룹으로 분리되는 crashpad 보조 프로세스도 실행별 고유 경로로 식별해 메모리 집계와 회수에 포함합니다. 브라우저에는 GUI 실행에 필요한 환경만 전달하고 운영 토큰은 제외합니다. 정상 종료가 지연되면 확인된 그룹을 강제 종료하고 실제 소멸을 확인합니다. 개인 Chrome을 프로세스 이름으로 일괄 종료하지 않습니다. guard까지 강제 종료되거나 소유권 확인이 실패한 경우 소유 마커를 유지하여 재시작을 차단합니다. 이 경우 운영자가 잔존 프로세스를 확인해야 합니다. 소유 확인 없이 마커 파일을 지우면 안 됩니다.
+
+소유 브라우저 프로세스 그룹의 RSS를 30초마다 점검하며 1GiB를 넘으면 회수합니다. 이는 순간적인 메모리 사용까지 막는 OS 하드 제한은 아닙니다. 설치 설정은 Node heap을 256MiB로 제한합니다. 브라우저 응답은 최대 2MiB이며 본문을 스트리밍으로 읽으면서 제한합니다. 인증된 `GET /health`에서 탭 수·호출 수·메모리 관측값과 상태를 확인합니다.
+
+### 전체 호출량과 인증
+
+모든 중계 호출은 전체 분당 30회, UTC 하루 3,000회로 제한합니다. MCP·REST 모두 같은 중계를 거치므로 호출 경로로 우회할 수 없습니다. 원장을 `OY_RELAY_STATE_DIR`에 원자적으로 저장하며 저장 실패·손상은 조회 거절로 처리합니다. 본문 업로드 중인 요청도 최대 8개 슬롯에 포함합니다. 실패한 원본 요청도 이미 소비한 예산을 돌려주지 않습니다.
+
+Cloudflare Access 사용 시 Worker secrets에 `OY_ACCESS_CLIENT_ID`와 `OY_ACCESS_CLIENT_SECRET`을 함께 설정합니다. 기존 `OY_RELAY_TOKEN`과 별개입니다. 사용자 도구 입력으로 전달하거나 덮어쓸 수 없습니다. Access 비밀이 다른 주소로 전달되지 않도록 리다이렉트를 거절합니다. Access 정책은 해당 서비스 토큰만 허용하는 Service Auth로 구성하며, Tunnel은 localhost:4319와 최종 404 경로만 연결합니다. 브라우저 디버깅 주소와 개인 네트워크 경로는 연결하지 않습니다.
+
+### macOS 전용 계정 설치
+
+시스템 설정에서 일반 사용자 계정 `daisorelay`를 만듭니다. 관리자 계정은 설치 스크립트가 거절합니다. 코드와 전용 브라우저는 `/Library/Application Support/DaisoRelay`에 root 소유로 설치하고, 토큰과 상태는 전용 계정 홈에만 둡니다. 자동 로그인은 설정하지 않습니다. 계정 생성과 최초 GUI 로그인은 사용자가 직접 수행해야 합니다.
+
+설치 도구는 기본적으로 변경 없는 계획만 출력합니다. `--apply`는 검토 후 사용자의 관리자 터미널에서 실행합니다. Cloudflare 자격증명 파일은 별도로 준비된 mode 0600 파일을 지정하며 채팅·Git에 복사하지 않습니다.
+
+```sh
+/usr/bin/python3 scripts/relay/install-macos.py \
+  --browser-app '/absolute/path/Google Chrome for Testing.app' \
+  --credentials '/absolute/private/path/cf-private.json'
+```
+
+실제 설치는 같은 명령 앞에 `sudo`, 끝에 `--apply`를 붙입니다. root 권한으로 npm 설치나 외부 코드를 다운로드하지 않으며, 사전에 검증한 코드·의존성·브라우저를 복사합니다. 기존 설치가 있으면 자동 덮어쓰지 않고 중단합니다.
+
+두 LaunchAgent는 `daisorelay`의 GUI 로그인 시 시작합니다. 브라우저의 GUI 세션이 필요하므로 부팅만 완료된 로그인 화면에서는 조회를 제공하지 않습니다. 실패 재시작은 최소 60초 간격이며, 중계의 정상 종료는 자동 재시작하지 않습니다. stdout/stderr은 `/dev/null`로 보내므로 디스크 로그가 누적되지 않습니다. 진단은 인증된 health와 launchctl 종료 상태로 확인합니다.
+
+전용 계정의 터미널에서 아래 명령으로 두 작업을 내릴 수 있습니다.
+
+```sh
+launchctl bootout "gui/$(id -u)/page.aka.daiso-oliveyoung-tunnel"
+launchctl bootout "gui/$(id -u)/page.aka.daiso-oliveyoung"
+```
+
+업그레이드는 두 작업을 중지하고 소유 브라우저가 없는 것을 확인한 뒤 수행해야 합니다. 기존 원장은 보존합니다. 전용 계정도 시스템에서 읽기 허용한 파일에는 접근할 수 있으므로, 개인 비밀은 기존 파일 권한으로 보호해야 합니다.
+
+### 2026-09-15 운영 보강 검증
+
+Playwright Chromium 153.0.8010.12에서 sandbox를 켜고 검증했습니다. 실제 조회 두 건과 부모 SIGKILL 후 잔여 소유 프로세스 0개를 확인했습니다. 모의 브라우저 API 조회 400회로 두 번 교체하고 각 교체 후에도 잔여 프로세스 0개를 확인했습니다. 팝업, 실제 renderer crash, 18초 Node watchdog도 검증했습니다. 메모리는 시점별 약 519~632MiB로 관측됐으며 장기간 무누수나 최고 사용량 보장을 의미하지 않습니다.

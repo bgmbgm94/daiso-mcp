@@ -1,26 +1,75 @@
 import { expect, it, vi } from 'vitest';
 import { createBrowserRunner } from '../../scripts/relay/browser.js';
 it('성공 JSON만 반환하고 브라우저 fetch에 제한시간을 설정한다', async () => {
-  const page = { evaluate: vi.fn().mockResolvedValue({ status: 200, body: { status: 'SUCCESS' } }) };
+  const page = {
+    evaluate: vi.fn().mockResolvedValue({ status: 200, body: { status: 'SUCCESS' } }),
+  };
   const run = createBrowserRunner(page);
-  expect(await run('/oystore/api/stock/stock-goods-info-v3', { goodsNo: 'A1' })).toEqual({ status: 'SUCCESS' });
-  expect(page.evaluate).toHaveBeenCalledWith(expect.any(Function), expect.objectContaining({ timeout: 15000 }));
-  for (const response of [{status: 403, body: {}}, {status: 200, body: null}, {status: 200, body: {status:'FAIL'}}]) {
+  expect(await run('/oystore/api/stock/stock-goods-info-v3', { goodsNo: 'A1' })).toEqual({
+    status: 'SUCCESS',
+  });
+  expect(page.evaluate).toHaveBeenCalledWith(
+    expect.any(Function),
+    expect.objectContaining({ timeout: 15000 }),
+  );
+  for (const response of [
+    { status: 403, body: {} },
+    { status: 200, body: null },
+    { status: 200, body: { status: 'FAIL' } },
+  ]) {
     page.evaluate.mockResolvedValue(response);
     await expect(run('/path', {})).rejects.toThrow('올리브영 브라우저 응답 실패');
   }
 });
 it('브라우저 컨텍스트에서 JSON 요청과 응답을 처리하고 HTML은 거절한다', async () => {
-  const fetch = vi.fn().mockResolvedValue(Response.json({status:'SUCCESS'}));
+  const fetch = vi.fn().mockResolvedValue(Response.json({ status: 'SUCCESS' }));
   vi.stubGlobal('fetch', fetch);
   const page = { evaluate: vi.fn().mockImplementation((fn, args) => fn(args)) };
   const run = createBrowserRunner(page);
   try {
-    expect(await run('/oystore/api/stock/stock-goods-info-v3', {goodsNo:'A1'})).toEqual({status:'SUCCESS'});
-    expect(fetch).toHaveBeenCalledWith('https://www.oliveyoung.co.kr/oystore/api/stock/stock-goods-info-v3', expect.objectContaining({method:'POST',credentials:'include',body:'{"goodsNo":"A1"}',signal:expect.any(AbortSignal)}));
+    expect(await run('/oystore/api/stock/stock-goods-info-v3', { goodsNo: 'A1' })).toEqual({
+      status: 'SUCCESS',
+    });
+    expect(fetch).toHaveBeenCalledWith(
+      'https://www.oliveyoung.co.kr/oystore/api/stock/stock-goods-info-v3',
+      expect.objectContaining({
+        method: 'POST',
+        credentials: 'include',
+        body: '{"goodsNo":"A1"}',
+        signal: expect.any(AbortSignal),
+      }),
+    );
     fetch.mockResolvedValue(new Response('<html>challenge</html>'));
     await expect(run('/p', {})).rejects.toThrow('브라우저 응답 실패');
     fetch.mockRejectedValue(new Error('network'));
     await expect(run('/p', {})).rejects.toThrow('network');
-  } finally { vi.unstubAllGlobals(); }
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+it('2MiB를 넘는 원본 응답은 읽기를 취소한다', async () => {
+  const cancel = vi.fn();
+  const stream = new ReadableStream({
+    start(controller) {
+      controller.enqueue(new Uint8Array(2 * 1024 * 1024 + 1));
+    },
+    cancel,
+  });
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(stream)));
+  const page = { evaluate: vi.fn().mockImplementation((fn, args) => fn(args)) };
+  try {
+    await expect(createBrowserRunner(page)('/p', {})).rejects.toThrow('response size');
+    expect(cancel).toHaveBeenCalledTimes(1);
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+it('본문 없는 HTTP 응답을 거절한다', async () => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null)));
+  const page = { evaluate: vi.fn().mockImplementation((fn, args) => fn(args)) };
+  try {
+    await expect(createBrowserRunner(page)('/p', {})).rejects.toThrow('body missing');
+  } finally {
+    vi.unstubAllGlobals();
+  }
 });
