@@ -10,6 +10,8 @@ export interface AppBindings {
   ZYTE_API_KEY?: string;
   OY_RELAY_URL?: string;
   OY_RELAY_TOKEN?: string;
+  OY_ACCESS_CLIENT_ID?: string;
+  OY_ACCESS_CLIENT_SECRET?: string;
   GS25_API_KEY?: string;
   GOOGLE_MAPS_API_KEY?: string;
   NAVER_CLIENT_ID?: string;

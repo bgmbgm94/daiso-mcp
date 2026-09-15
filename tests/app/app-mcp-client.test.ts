@@ -144,3 +144,14 @@ it('MCP도 키가 남아 있어도 유료 호출 없이 정책 오류를 전달�
     expect(mockFetch.mock.calls.every(([url]) => new URL(String(url)).hostname !== 'api.zyte.com')).toBe(true);
   } finally { await client.close(); }
 });
+it('MCP 올리브영 요청은 운영 바인딩의 Access 자격증명만 사용한다', async () => {
+  const { __testOnlyClearOliveyoungCaches } = await import('../../src/services/oliveyoung/client.js');
+  __testOnlyClearOliveyoungCaches();
+  mockFetch.mockImplementation(async () => Response.json({status:'SUCCESS',data:{}}));
+  const client=await createLocalMcpClient({OY_RELAY_URL:'https://relay.example',OY_RELAY_TOKEN:'relay-test',OY_ACCESS_CLIENT_ID:'access-test-id',OY_ACCESS_CLIENT_SECRET:'access-test-secret'});
+  try {
+    const result=await client.callTool({name:'oliveyoung_search_products',arguments:{keyword:'팩',accessClientSecret:'evil'}});
+    expect(result.isError).not.toBe(true);
+    expect(mockFetch).toHaveBeenCalledWith('https://relay.example/v1/oliveyoung/product-search-v3',expect.objectContaining({redirect:'error',headers:expect.objectContaining({'CF-Access-Client-Id':'access-test-id','CF-Access-Client-Secret':'access-test-secret'})}));
+  }finally{await client.close();}
+});

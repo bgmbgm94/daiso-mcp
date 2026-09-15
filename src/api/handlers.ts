@@ -63,6 +63,8 @@ export async function handleOliveyoungSearchProducts(c: ApiContext) {
       {
         relayUrl: c.env?.OY_RELAY_URL,
         relayToken: c.env?.OY_RELAY_TOKEN,
+        accessClientId: c.env?.OY_ACCESS_CLIENT_ID,
+        accessClientSecret: c.env?.OY_ACCESS_CLIENT_SECRET,
         timeout: timeoutMs,
       },
     );
@@ -108,6 +110,8 @@ export async function handleOliveyoungFindStores(c: ApiContext) {
       {
         relayUrl: c.env?.OY_RELAY_URL,
         relayToken: c.env?.OY_RELAY_TOKEN,
+        accessClientId: c.env?.OY_ACCESS_CLIENT_ID,
+        accessClientSecret: c.env?.OY_ACCESS_CLIENT_SECRET,
         timeout: timeoutMs,
       }
     );
@@ -161,6 +165,8 @@ export async function handleOliveyoungCheckInventory(c: ApiContext) {
         {
           relayUrl: c.env?.OY_RELAY_URL,
           relayToken: c.env?.OY_RELAY_TOKEN,
+          accessClientId: c.env?.OY_ACCESS_CLIENT_ID,
+          accessClientSecret: c.env?.OY_ACCESS_CLIENT_SECRET,
           timeout: timeoutMs,
         }
       ),
@@ -175,6 +181,8 @@ export async function handleOliveyoungCheckInventory(c: ApiContext) {
         {
           relayUrl: c.env?.OY_RELAY_URL,
           relayToken: c.env?.OY_RELAY_TOKEN,
+          accessClientId: c.env?.OY_ACCESS_CLIENT_ID,
+          accessClientSecret: c.env?.OY_ACCESS_CLIENT_SECRET,
           timeout: timeoutMs,
         }
       ),
@@ -190,6 +198,8 @@ export async function handleOliveyoungCheckInventory(c: ApiContext) {
       {
         relayUrl: c.env?.OY_RELAY_URL,
         relayToken: c.env?.OY_RELAY_TOKEN,
+        accessClientId: c.env?.OY_ACCESS_CLIENT_ID,
+        accessClientSecret: c.env?.OY_ACCESS_CLIENT_SECRET,
         timeout: timeoutMs,
       }
     );
